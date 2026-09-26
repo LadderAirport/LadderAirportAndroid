@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Android
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: android
           fetch-depth: 0
@@ -42,7 +42,7 @@ jobs:
           test -d LadderAirport/agent/frp
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -51,14 +51,16 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: android/core/go.mod
+          cache-dependency-path: android/core/go.sum
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        # v3 defaults to obsolete `tools` package and fails on current runners.
+        uses: android-actions/setup-android@v4
 
-      - name: Install NDK
+      - name: Install NDK and Android platform
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "ndk;28.0.13004108"
+          sdkmanager "ndk;28.0.13004108" "platforms;android-35" "build-tools;35.0.0"
           echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/28.0.13004108" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
