@@ -23,6 +23,11 @@ class MainPagerAdapter(
             2 -> logsBinding.root
             else -> throw IllegalArgumentException("Invalid position: $viewType")
         }
+        (view.parent as? ViewGroup)?.removeView(view)
+        view.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
         return object : RecyclerView.ViewHolder(view) {}
     }
 

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md_theme_primary">#B4C5FF</color>
+    <color name="md_theme_onPrimary">#002A78</color>
+    <color name="md_theme_primaryContainer">#2563EB</color>
+    <color name="md_theme_onPrimaryContainer">#EEEFFF</color>
+    <color name="md_theme_secondary">#B4C5FF</color>
+    <color name="md_theme_onSecondary">#182D63</color>
+    <color name="md_theme_secondaryContainer">#33467E</color>
+    <color name="md_theme_onSecondaryContainer">#A4B6F5</color>
+    <color name="md_theme_tertiary">#FFB596</color>
+    <color name="md_theme_onTertiary">#581E00</color>
+    <color name="md_theme_tertiaryContainer">#BC4800</color>
+    <color name="md_theme_onTertiaryContainer">#FFEDE6</color>
+    <color name="md_theme_error">#FFB4AB</color>
+    <color name="md_theme_onError">#690005</color>
+    <color name="md_theme_errorContainer">#93000A</color>
+    <color name="md_theme_onErrorContainer">#FFDAD6</color>
+    <color name="md_theme_background">#11131B</color>
+    <color name="md_theme_onBackground">#E1E2ED</color>
+    <color name="md_theme_surface">#11131B</color>
+    <color name="md_theme_onSurface">#E1E2ED</color>
+    <color name="md_theme_surfaceVariant">#434655</color>
+    <color name="md_theme_onSurfaceVariant">#C3C6D7</color>
+    <color name="md_theme_outline">#8D90A0</color>
+    <color name="md_theme_outlineVariant">#434655</color>
+    <color name="md_theme_surfaceDim">#11131B</color>
+    <color name="md_theme_surfaceBright">#373942</color>
+    <color name="md_theme_surfaceContainerLowest">#0C0E16</color>
+    <color name="md_theme_surfaceContainerLow">#191B23</color>
+    <color name="md_theme_surfaceContainer">#1D1F27</color>
+    <color name="md_theme_surfaceContainerHigh">#282A32</color>
+    <color name="md_theme_surfaceContainerHighest">#32343D</color>
+    <color name="md_theme_inverseSurface">#E1E2ED</color>
+    <color name="md_theme_inverseOnSurface">#2E3039</color>
+    <color name="md_theme_inversePrimary">#0053DB</color>
+
+    <color name="status_running">#9EE6B0</color>
+    <color name="status_running_bg">#123D26</color>
+</resources>

@@ -1,39 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand / Primary -->
-    <color name="primary">#2563EB</color>
-    <color name="primary_dark">#1D4ED8</color>
-    <color name="primary_container">#EFF6FF</color>
-    <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_container">#1E40AF</color>
+    <!-- Fidelity scheme, spec 2025, seed #2563EB. API 31+ is replaced by dynamic color. -->
+    <color name="md_theme_primary">#004AC6</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#2563EB</color>
+    <color name="md_theme_onPrimaryContainer">#EEEFFF</color>
+    <color name="md_theme_secondary">#495C95</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+    <color name="md_theme_secondaryContainer">#ACBFFF</color>
+    <color name="md_theme_onSecondaryContainer">#394C84</color>
+    <color name="md_theme_tertiary">#943700</color>
+    <color name="md_theme_onTertiary">#FFFFFF</color>
+    <color name="md_theme_tertiaryContainer">#BC4800</color>
+    <color name="md_theme_onTertiaryContainer">#FFEDE6</color>
+    <color name="md_theme_error">#BA1A1A</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+    <color name="md_theme_errorContainer">#FFDAD6</color>
+    <color name="md_theme_onErrorContainer">#93000A</color>
+    <color name="md_theme_background">#FAF8FF</color>
+    <color name="md_theme_onBackground">#191B23</color>
+    <color name="md_theme_surface">#FAF8FF</color>
+    <color name="md_theme_onSurface">#191B23</color>
+    <color name="md_theme_surfaceVariant">#DFE1F4</color>
+    <color name="md_theme_onSurfaceVariant">#434655</color>
+    <color name="md_theme_outline">#737686</color>
+    <color name="md_theme_outlineVariant">#C3C6D7</color>
+    <color name="md_theme_surfaceDim">#D9D9E5</color>
+    <color name="md_theme_surfaceBright">#FAF8FF</color>
+    <color name="md_theme_surfaceContainerLowest">#FFFFFF</color>
+    <color name="md_theme_surfaceContainerLow">#F3F3FE</color>
+    <color name="md_theme_surfaceContainer">#EDEDF9</color>
+    <color name="md_theme_surfaceContainerHigh">#E7E7F3</color>
+    <color name="md_theme_surfaceContainerHighest">#E1E2ED</color>
+    <color name="md_theme_inverseSurface">#2E3039</color>
+    <color name="md_theme_inverseOnSurface">#F0F0FB</color>
+    <color name="md_theme_inversePrimary">#B4C5FF</color>
 
-    <!-- Secondary -->
-    <color name="secondary">#0D9488</color>
-    <color name="secondary_container">#F0FDFA</color>
-    <color name="on_secondary">#FFFFFF</color>
+    <!-- Success is not a Material color role. Contrast is above 4.5:1. -->
+    <color name="status_running">#085C28</color>
+    <color name="status_running_bg">#D8F3E1</color>
 
-    <!-- Status Colors -->
-    <color name="status_running">#10B981</color>
-    <color name="status_running_bg">#ECFDF5</color>
-    <color name="status_stopped">#64748B</color>
-    <color name="status_stopped_bg">#F1F5F9</color>
-    <color name="status_error">#EF4444</color>
-    <color name="status_error_bg">#FEF2F2</color>
-
-    <!-- Surfaces & Backgrounds -->
-    <color name="surface">#F8FAFC</color>
-    <color name="surface_card">#FFFFFF</color>
-    <color name="surface_variant">#F1F5F9</color>
-    <color name="card_stroke">#E2E8F0</color>
-
-    <!-- Typography -->
-    <color name="text_primary">#0F172A</color>
-    <color name="text_secondary">#64748B</color>
-    <color name="text_tertiary">#94A3B8</color>
-
-    <!-- Terminal -->
-    <color name="terminal_bg">#0F172A</color>
-    <color name="terminal_header">#1E293B</color>
-    <color name="terminal_text">#F1F5F9</color>
-    <color name="terminal_accent">#38BDF8</color>
+    <color name="terminal_bg">#11131B</color>
+    <color name="terminal_header">#1D1F27</color>
+    <color name="terminal_text">#E1E2ED</color>
+    <color name="terminal_accent">#B4C5FF</color>
+    <color name="terminal_muted">#C3C6D7</color>
+    <color name="terminal_divider">#434655</color>
+    <color name="ic_launcher_background">#09090B</color>
 </resources>

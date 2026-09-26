@@ -4,24 +4,24 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/surface"
+    android:background="?attr/colorSurface"
+    android:clipToPadding="false"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/page_margin">
 
-        <!-- Hero State Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/surface_card"
-            app:cardCornerRadius="16dp"
+            android:layout_marginBottom="@dimen/page_margin"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
             app:cardElevation="0dp"
-            app:strokeColor="@color/card_stroke"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -36,34 +36,38 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- Status Pill -->
                     <LinearLayout
                         android:id="@+id/pillStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@color/status_stopped_bg"
+                        android:background="@drawable/bg_status_pill"
+                        android:backgroundTint="?attr/colorSurfaceContainerHigh"
+                        android:contentDescription="@string/status_stopped"
                         android:gravity="center_vertical"
+                        android:minHeight="32dp"
                         android:orientation="horizontal"
                         android:paddingStart="10dp"
-                        android:paddingTop="5dp"
+                        android:paddingTop="6dp"
                         android:paddingEnd="12dp"
-                        android:paddingBottom="5dp">
+                        android:paddingBottom="6dp">
 
                         <View
                             android:id="@+id/dotStatus"
                             android:layout_width="8dp"
                             android:layout_height="8dp"
-                            android:background="@color/status_stopped" />
+                            android:background="@drawable/bg_status_dot"
+                            android:backgroundTint="?attr/colorOnSurfaceVariant"
+                            android:importantForAccessibility="no" />
 
                         <TextView
                             android:id="@+id/tvStatusText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
-                            android:text="已停止"
-                            android:textColor="@color/status_stopped"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:importantForAccessibility="no"
+                            android:text="@string/status_stopped"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <View
@@ -75,8 +79,8 @@
                         android:id="@+id/tvCoreVersion"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/text_tertiary"
-                        android:textSize="12sp"
+                        android:textAppearance="?attr/textAppearanceLabelMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         tools:text="sing-box 1.12.22" />
                 </LinearLayout>
 
@@ -86,77 +90,70 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="未配置节点"
-                    android:textColor="@color/text_primary"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <TextView
                     android:id="@+id/tvHeroPanelUrl"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:fontFamily="monospace"
+                    android:layout_marginTop="4dp"
                     android:text="请先在「配置」页面填入或扫码导入管控信息"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
 
-                <!-- Error Message Banner -->
                 <TextView
                     android:id="@+id/tvHeroError"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@color/status_error_bg"
-                    android:padding="10dp"
-                    android:textColor="@color/status_error"
-                    android:textSize="12sp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_inline_message"
+                    android:backgroundTint="?attr/colorErrorContainer"
+                    android:padding="12dp"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnErrorContainer"
                     android:visibility="gone"
                     tools:text="连接失败：context deadline exceeded" />
 
-                <!-- Big Power Action Button -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPower"
                     android:layout_width="match_parent"
-                    android:layout_height="54dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
-                    android:backgroundTint="@color/primary"
-                    android:text="启动 Agent"
-                    android:textColor="@color/on_primary"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="12dp"
+                    android:minHeight="56dp"
+                    android:text="@string/btn_start"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnPrimary"
                     app:icon="@drawable/ic_power"
                     app:iconGravity="textStart"
-                    app:iconTint="@color/on_primary" />
+                    app:iconTint="?attr/colorOnPrimary" />
 
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Metrics 2x2 Grid -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
-            <!-- Card: Uplink -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/surface_card"
-                app:cardCornerRadius="14dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="@dimen/shape_corner_extra_large"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/card_stroke"
+                app:strokeColor="?attr/colorOutlineVariant"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="16dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -167,16 +164,17 @@
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:importantForAccessibility="no"
                             android:src="@drawable/ic_upload"
-                            app:tint="@color/primary" />
+                            app:tint="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="上行流量"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <TextView
@@ -185,30 +183,28 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="0 B"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Card: Downlink -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/surface_card"
-                app:cardCornerRadius="14dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="@dimen/shape_corner_extra_large"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/card_stroke"
+                app:strokeColor="?attr/colorOutlineVariant"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="16dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -219,16 +215,17 @@
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:importantForAccessibility="no"
                             android:src="@drawable/ic_download"
-                            app:tint="@color/secondary" />
+                            app:tint="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="下行流量"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <TextView
@@ -237,9 +234,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="0 B"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
@@ -249,26 +245,25 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="@dimen/page_margin"
             android:orientation="horizontal">
 
-            <!-- Card: Connections -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/surface_card"
-                app:cardCornerRadius="14dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="@dimen/shape_corner_extra_large"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/card_stroke"
+                app:strokeColor="?attr/colorOutlineVariant"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="16dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -279,16 +274,17 @@
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:importantForAccessibility="no"
                             android:src="@drawable/ic_link"
-                            app:tint="@color/primary_dark" />
+                            app:tint="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="活跃连接"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <TextView
@@ -297,30 +293,28 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="0"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Card: Uptime -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="@color/surface_card"
-                app:cardCornerRadius="14dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="@dimen/shape_corner_extra_large"
                 app:cardElevation="0dp"
-                app:strokeColor="@color/card_stroke"
+                app:strokeColor="?attr/colorOutlineVariant"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="16dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -331,16 +325,17 @@
                         <ImageView
                             android:layout_width="20dp"
                             android:layout_height="20dp"
+                            android:importantForAccessibility="no"
                             android:src="@drawable/ic_timer"
-                            app:tint="@color/status_stopped" />
+                            app:tint="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="运行时间"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <TextView
@@ -349,23 +344,21 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="0s"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
 
-        <!-- Quick Info Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/surface_card"
-            app:cardCornerRadius="14dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
             app:cardElevation="0dp"
-            app:strokeColor="@color/card_stroke"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -378,9 +371,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="节点运行状态"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -393,15 +385,15 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="控制通道模式"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="uplink-ws（WebSocket实时）"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -415,15 +407,15 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="数据入站通道"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="内嵌 FRPC 反向隧道"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -437,16 +429,40 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="前台服务保活"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:id="@+id/tvBatteryStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="已常驻 (点击优化白名单)"
-                        android:textColor="@color/primary"
-                        android:textSize="13sp" />
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="当前配置版本"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvConfigHash"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="未同步"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
 
             </LinearLayout>

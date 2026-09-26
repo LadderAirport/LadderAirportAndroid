@@ -75,11 +75,15 @@ object DeviceMetricsHelper {
         return json.toString()
     }
 
+    @Volatile
+    private var isProcStatReadable: Boolean = true
+
     private fun sampleCpuUsage(): Double {
+        if (!isProcStatReadable) return 0.0
         try {
-            val reader = RandomAccessFile("/proc/stat", "r")
-            val load = reader.readLine() ?: return 0.0
-            reader.close()
+            val load = RandomAccessFile("/proc/stat", "r").use { reader ->
+                reader.readLine()
+            } ?: return 0.0
 
             val toks = load.split(" +".toRegex())
             if (toks.size < 5) return 0.0
@@ -101,6 +105,7 @@ object DeviceMetricsHelper {
             prevTotalCpu = total
             prevIdleCpu = idle
         } catch (_: Exception) {
+            isProcStatReadable = false
         }
         return 0.0
     }

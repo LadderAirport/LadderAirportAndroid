@@ -7,16 +7,27 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
+import android.util.TypedValue
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.AttrRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import com.google.android.material.color.DynamicColors
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.journeyapps.barcodescanner.ScanContract
@@ -35,6 +46,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logsBinding: PageLogsBinding
 
     private val prefs by lazy { LadderApplication.instance.prefs }
+    private var lastConfigHash: String = ""
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -70,13 +86,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        DynamicColors.applyToActivityIfAvailable(this)
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemInsets()
 
-        dashboardBinding = PageDashboardBinding.inflate(layoutInflater)
-        configBinding = PageConfigBinding.inflate(layoutInflater)
-        logsBinding = PageLogsBinding.inflate(layoutInflater)
+        dashboardBinding = PageDashboardBinding.inflate(layoutInflater, binding.viewPager, false)
+        configBinding = PageConfigBinding.inflate(layoutInflater, binding.viewPager, false)
+        logsBinding = PageLogsBinding.inflate(layoutInflater, binding.viewPager, false)
 
         setupNavigation()
         initDashboard()
@@ -84,6 +103,39 @@ class MainActivity : AppCompatActivity() {
         initLogs()
         observeData()
         checkPermissions()
+
+        if (prefs.autoStart && prefs.isConfigured() && prefs.enrolled) {
+            if (AgentService.isServiceRunning.value != true) {
+                AgentService.start(this)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadCurrentConfigDisplay()
+        if (prefs.autoStart && prefs.isConfigured() && prefs.enrolled) {
+            if (AgentService.isServiceRunning.value != true) {
+                AgentService.start(this)
+            }
+        }
+    }
+
+    private fun applySystemInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val imeVisible = ime.bottom > 0
+            binding.root.updatePadding(left = bars.left, right = bars.right)
+            binding.appBar.updatePadding(top = bars.top)
+            binding.bottomNav.visibility = if (imeVisible) View.GONE else View.VISIBLE
+            binding.bottomNav.updatePadding(bottom = bars.bottom)
+            binding.viewPager.updatePadding(bottom = if (imeVisible) ime.bottom else 0)
+            WindowInsetsCompat.CONSUMED
+        }
+        ViewCompat.requestApplyInsets(binding.root)
     }
 
     private fun setupNavigation() {
@@ -104,7 +156,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 when (position) {
                     0 -> binding.bottomNav.selectedItemId = R.id.nav_dashboard
-                    1 -> binding.bottomNav.selectedItemId = R.id.nav_config
+                    1 -> {
+                        binding.bottomNav.selectedItemId = R.id.nav_config
+                        loadCurrentConfigDisplay()
+                    }
                     2 -> binding.bottomNav.selectedItemId = R.id.nav_logs
                 }
             }
@@ -133,7 +188,21 @@ class MainActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
                 saveInputsToPrefs()
-                AgentService.start(this)
+                if (!prefs.enrolled) {
+                    AlertDialog.Builder(this)
+                        .setTitle("节点尚未注册")
+                        .setMessage("该节点尚未向 Panel 注册（未换取控制令牌）。\n\n是否立即一键注册并启动 Agent？")
+                        .setPositiveButton("立即注册并启动") { _, _ ->
+                            performEnrollment(autoStartAfter = true)
+                        }
+                        .setNegativeButton("直接尝试启动") { _, _ ->
+                            AgentService.start(this)
+                        }
+                        .setNeutralButton("取消", null)
+                        .show()
+                } else {
+                    AgentService.start(this)
+                }
             }
         }
 
@@ -172,8 +241,71 @@ class MainActivity : AppCompatActivity() {
             performEnrollment(autoStartAfter = false)
         }
 
+        val resetEnrollment = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (!prefs.enrolled) return
+                val url = configBinding.etPanelUrl.text?.toString()?.trim().orEmpty()
+                val nodeId = configBinding.etNodeId.text?.toString()?.trim().orEmpty()
+                if (url != prefs.panelUrl || nodeId != prefs.nodeId) {
+                    prefs.enrolled = false
+                    refreshEnrollmentUi()
+                }
+            }
+        }
+        configBinding.etPanelUrl.addTextChangedListener(resetEnrollment)
+        configBinding.etNodeId.addTextChangedListener(resetEnrollment)
+        refreshEnrollmentUi()
+
         configBinding.layoutBatteryOpt.setOnClickListener {
             requestBatteryOptimizationExemption()
+        }
+
+        configBinding.btnRefreshConfig.setOnClickListener {
+            loadCurrentConfigDisplay()
+            Toast.makeText(this, "已刷新下发配置", Toast.LENGTH_SHORT).show()
+        }
+
+        configBinding.btnCopyConfig.setOnClickListener {
+            val text = configBinding.tvCurrentConfigContent.text?.toString().orEmpty()
+            if (text.isNotBlank() && !text.startsWith("暂未")) {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("LadderAirport Config", text))
+                Toast.makeText(this, "节点配置已复制到剪贴板", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "暂无配置可复制", Toast.LENGTH_SHORT).show()
+            }
+        }
+        loadCurrentConfigDisplay()
+    }
+
+    private fun loadCurrentConfigDisplay() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val configFile = File(filesDir, "current.json")
+            if (configFile.exists() && configFile.length() > 0) {
+                try {
+                    val raw = configFile.readText()
+                    val pretty = JSONObject(raw).toString(2)
+                    val lastMod = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(configFile.lastModified()))
+                    val sizeKb = String.format(Locale.US, "%.1f KB", configFile.length() / 1024.0)
+                    withContext(Dispatchers.Main) {
+                        configBinding.tvConfigStatus.text = "已同步 ($lastMod, $sizeKb)"
+                        configBinding.tvCurrentConfigContent.text = pretty
+                    }
+                } catch (_: Exception) {
+                    val raw = configFile.readText()
+                    withContext(Dispatchers.Main) {
+                        configBinding.tvConfigStatus.text = "已同步 (原始格式)"
+                        configBinding.tvCurrentConfigContent.text = raw
+                    }
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    configBinding.tvConfigStatus.text = "暂无生效的下发配置"
+                    configBinding.tvCurrentConfigContent.text = "暂未从 Panel 获取到下发的节点配置 (current.json)\n请确认 Agent 服务已启动并成功连接至 Panel。"
+                }
+            }
         }
     }
 
@@ -192,6 +324,13 @@ class MainActivity : AppCompatActivity() {
             cm.setPrimaryClip(ClipData.newPlainText("LadderAirport Logs", lines.joinToString("\n")))
             Toast.makeText(this, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun refreshEnrollmentUi() {
+        val enrolled = prefs.enrolled
+        configBinding.cardQrPairing.visibility = if (enrolled) View.GONE else View.VISIBLE
+        configBinding.btnEnroll.visibility = if (enrolled) View.GONE else View.VISIBLE
+        configBinding.etToken.hint = if (enrolled) "控制令牌" else getString(R.string.token_hint)
     }
 
     private fun updateDashboardConfigDisplay() {
@@ -272,50 +411,33 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateRunningState(isRunning: Boolean) {
         if (isRunning) {
-            // Dashboard Hero
-            dashboardBinding.pillStatus.setBackgroundColor(getColor(R.color.status_running_bg))
-            dashboardBinding.dotStatus.setBackgroundColor(getColor(R.color.status_running))
-            dashboardBinding.tvStatusText.text = "运行中"
-            dashboardBinding.tvStatusText.textColor(R.color.status_running)
-
             dashboardBinding.btnPower.text = "停止 Agent 服务"
-            dashboardBinding.btnPower.backgroundTintList = getColorStateList(R.color.status_error)
+            dashboardBinding.btnPower.backgroundTintList =
+                ColorStateList.valueOf(themeColor(androidx.appcompat.R.attr.colorError))
+            dashboardBinding.btnPower.setTextColor(themeColor(com.google.android.material.R.attr.colorOnError))
+            dashboardBinding.btnPower.iconTint =
+                ColorStateList.valueOf(themeColor(com.google.android.material.R.attr.colorOnError))
 
-            // Top Bar
-            binding.topStatusBadge.setBackgroundColor(getColor(R.color.status_running_bg))
-            binding.topStatusDot.setBackgroundColor(getColor(R.color.status_running))
-            binding.topStatusText.text = "在线"
-            binding.topStatusText.textColor(R.color.status_running)
-
-            // Disable edits during run
             configBinding.etPanelUrl.isEnabled = false
             configBinding.etNodeId.isEnabled = false
             configBinding.etToken.isEnabled = false
             configBinding.btnEnroll.isEnabled = false
             configBinding.cardQrPairing.visibility = View.GONE
         } else {
-            // Dashboard Hero
-            dashboardBinding.pillStatus.setBackgroundColor(getColor(R.color.status_stopped_bg))
-            dashboardBinding.dotStatus.setBackgroundColor(getColor(R.color.status_stopped))
-            dashboardBinding.tvStatusText.text = "已停止"
-            dashboardBinding.tvStatusText.textColor(R.color.status_stopped)
+            dashboardBinding.btnPower.text = getString(R.string.btn_start)
+            dashboardBinding.btnPower.backgroundTintList =
+                ColorStateList.valueOf(themeColor(androidx.appcompat.R.attr.colorPrimary))
+            dashboardBinding.btnPower.setTextColor(themeColor(com.google.android.material.R.attr.colorOnPrimary))
+            dashboardBinding.btnPower.iconTint =
+                ColorStateList.valueOf(themeColor(com.google.android.material.R.attr.colorOnPrimary))
 
-            dashboardBinding.btnPower.text = "启动 Agent"
-            dashboardBinding.btnPower.backgroundTintList = getColorStateList(R.color.primary)
-
-            // Top Bar
-            binding.topStatusBadge.setBackgroundColor(getColor(R.color.status_stopped_bg))
-            binding.topStatusDot.setBackgroundColor(getColor(R.color.status_stopped))
-            binding.topStatusText.text = "已停止"
-            binding.topStatusText.textColor(R.color.status_stopped)
-
-            // Enable edits
             configBinding.etPanelUrl.isEnabled = true
             configBinding.etNodeId.isEnabled = true
             configBinding.etToken.isEnabled = true
             configBinding.btnEnroll.isEnabled = true
-            configBinding.cardQrPairing.visibility = View.VISIBLE
+            refreshEnrollmentUi()
         }
+        refreshStatusChrome()
     }
 
     private fun updateStatusDetails(status: AgentStatus) {
@@ -323,21 +445,71 @@ class MainActivity : AppCompatActivity() {
         dashboardBinding.tvMetricDownlink.text = formatBytes(status.downlinkBytes)
         dashboardBinding.tvMetricConns.text = status.connections.toString()
         dashboardBinding.tvMetricUptime.text = formatUptime(status.uptimeSecs)
+        dashboardBinding.tvConfigHash.text = if (status.configHash.isNotBlank()) {
+            if (status.configHash != lastConfigHash) {
+                lastConfigHash = status.configHash
+                loadCurrentConfigDisplay()
+            }
+            if (status.configHash.length > 12) status.configHash.take(12) else status.configHash
+        } else {
+            "未同步"
+        }
 
         if (status.lastError.isNotBlank() && !status.running) {
             dashboardBinding.tvHeroError.visibility = View.VISIBLE
             dashboardBinding.tvHeroError.text = "异常: ${status.lastError}"
-            dashboardBinding.pillStatus.setBackgroundColor(getColor(R.color.status_error_bg))
-            dashboardBinding.dotStatus.setBackgroundColor(getColor(R.color.status_error))
-            dashboardBinding.tvStatusText.text = "运行异常"
-            dashboardBinding.tvStatusText.textColor(R.color.status_error)
-
-            binding.topStatusBadge.setBackgroundColor(getColor(R.color.status_error_bg))
-            binding.topStatusDot.setBackgroundColor(getColor(R.color.status_error))
-            binding.topStatusText.text = "异常"
-            binding.topStatusText.textColor(R.color.status_error)
         } else {
             dashboardBinding.tvHeroError.visibility = View.GONE
+        }
+        refreshStatusChrome()
+    }
+
+    private fun refreshStatusChrome() {
+        val running = AgentService.isServiceRunning.value == true
+        val status = AgentService.currentStatus.value
+        val kind = when {
+            status != null && status.lastError.isNotBlank() && !running -> StatusKind.ERROR
+            running -> StatusKind.RUNNING
+            else -> StatusKind.STOPPED
+        }
+        val dashboardLabel = when (kind) {
+            StatusKind.RUNNING -> "运行中"
+            StatusKind.ERROR -> "运行异常"
+            StatusKind.STOPPED -> getString(R.string.status_stopped)
+        }
+        val topLabel = when (kind) {
+            StatusKind.RUNNING -> "在线"
+            StatusKind.ERROR -> "异常"
+            StatusKind.STOPPED -> getString(R.string.status_stopped)
+        }
+        applyStatus(dashboardBinding.pillStatus, dashboardBinding.dotStatus, dashboardBinding.tvStatusText, kind, dashboardLabel)
+        applyStatus(binding.topStatusBadge, binding.topStatusDot, binding.topStatusText, kind, topLabel)
+    }
+
+    private fun applyStatus(badge: View, dot: View, label: TextView, kind: StatusKind, text: String) {
+        val (bg, fg) = when (kind) {
+            StatusKind.RUNNING -> getColor(R.color.status_running_bg) to getColor(R.color.status_running)
+            StatusKind.STOPPED ->
+                themeColor(com.google.android.material.R.attr.colorSurfaceContainerHigh) to
+                    themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+            StatusKind.ERROR ->
+                themeColor(com.google.android.material.R.attr.colorErrorContainer) to
+                    themeColor(com.google.android.material.R.attr.colorOnErrorContainer)
+        }
+        badge.backgroundTintList = ColorStateList.valueOf(bg)
+        dot.backgroundTintList = ColorStateList.valueOf(fg)
+        label.text = text
+        label.setTextColor(fg)
+        badge.contentDescription = text
+    }
+
+    private fun themeColor(@AttrRes attr: Int): Int {
+        val typedValue = TypedValue()
+        theme.resolveAttribute(attr, typedValue, true)
+        return if (typedValue.resourceId != 0) {
+            ContextCompat.getColor(this, typedValue.resourceId)
+        } else {
+            typedValue.data
         }
     }
 
@@ -395,13 +567,19 @@ class MainActivity : AppCompatActivity() {
                 val resObj = JSONObject(resJson)
 
                 withContext(Dispatchers.Main) {
-                    progress.dismiss()
+                    if (progress.isShowing) {
+                        runCatching { progress.dismiss() }
+                    }
+                    if (isFinishing || isDestroyed) return@withContext
+
                     if (resObj.optBoolean("ok", false)) {
                         val issuedToken = resObj.optString("token", "")
                         if (issuedToken.isNotBlank()) {
                             prefs.token = issuedToken
                             configBinding.etToken.setText(issuedToken)
                         }
+                        prefs.enrolled = true
+                        refreshEnrollmentUi()
                         LadderApplication.appendLog("节点注册成功：已取得控制令牌，未初始化管理面 TLS")
 
                         if (autoStartAfter) {
@@ -430,7 +608,11 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    progress.dismiss()
+                    if (progress.isShowing) {
+                        runCatching { progress.dismiss() }
+                    }
+                    if (isFinishing || isDestroyed) return@withContext
+
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle("注册异常")
                         .setMessage(e.message ?: "网络连接异常")
@@ -443,21 +625,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                try {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                } catch (_: Exception) {
-                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                    startActivity(intent)
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
                 }
-            } else {
-                Toast.makeText(this, "已获取忽略电池优化白名单", Toast.LENGTH_SHORT).show()
+                startActivity(intent)
+            } catch (_: Exception) {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                startActivity(intent)
             }
+        } else {
+            Toast.makeText(this, "已获取忽略电池优化白名单", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -474,11 +654,11 @@ class MainActivity : AppCompatActivity() {
     private fun formatBytes(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
         val kb = bytes / 1024.0
-        if (kb < 1024) return String.format("%.1f KB", kb)
+        if (kb < 1024) return String.format(java.util.Locale.US, "%.1f KB", kb)
         val mb = kb / 1024.0
-        if (mb < 1024) return String.format("%.1f MB", mb)
+        if (mb < 1024) return String.format(java.util.Locale.US, "%.1f MB", mb)
         val gb = mb / 1024.0
-        return String.format("%.2f GB", gb)
+        return String.format(java.util.Locale.US, "%.2f GB", gb)
     }
 
     private fun formatUptime(seconds: Long): String {
@@ -487,15 +667,18 @@ class MainActivity : AppCompatActivity() {
         val mins = (seconds % 3600) / 60
         val secs = seconds % 60
         return if (hrs > 0) {
-            String.format("%dh %02dm %02ds", hrs, mins, secs)
+            String.format(java.util.Locale.US, "%dh %02dm %02ds", hrs, mins, secs)
         } else if (mins > 0) {
-            String.format("%dm %02ds", mins, secs)
+            String.format(java.util.Locale.US, "%dm %02ds", mins, secs)
         } else {
             "${secs}s"
         }
     }
 
-    private fun android.widget.TextView.textColor(resId: Int) {
-        setTextColor(getColor(resId))
-    }
+}
+
+private enum class StatusKind {
+    RUNNING,
+    STOPPED,
+    ERROR,
 }

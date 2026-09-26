@@ -3,32 +3,31 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/surface"
+    android:background="?attr/colorSurface"
+    android:clipToPadding="false"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/page_margin">
 
-        <!-- Card 1: Fast QR Pairing Banner -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardQrPairing"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/primary_container"
-            app:cardCornerRadius="16dp"
+            android:layout_marginBottom="@dimen/page_margin"
+            app:cardBackgroundColor="?attr/colorPrimaryContainer"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
             app:cardElevation="0dp"
-            app:strokeColor="@color/primary"
-            app:strokeWidth="1dp">
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:padding="20dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -37,19 +36,19 @@
                     android:orientation="horizontal">
 
                     <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
                         android:src="@drawable/ic_qr_code"
-                        app:tint="@color/primary" />
+                        app:tint="?attr/colorOnPrimaryContainer" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
                         android:text="扫码一键配对"
-                        android:textColor="@color/on_primary_container"
-                        android:textSize="17sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textColor="?attr/colorOnPrimaryContainer" />
                 </LinearLayout>
 
                 <TextView
@@ -57,37 +56,33 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="在 Panel 网页端点击「扫码配对」，使用手机相机扫描屏幕二维码，即可自动填入地址、节点 ID 和注册令牌并快速接入。"
-                    android:textColor="@color/on_primary_container"
-                    android:textSize="13sp" />
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnScanQrCode"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="14dp"
-                    android:backgroundTint="@color/primary"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:minHeight="48dp"
                     android:text="打开相机扫描配对二维码"
-                    android:textColor="@color/on_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="10dp"
+                    android:textColor="?attr/colorOnPrimary"
                     app:icon="@drawable/ic_qr_code"
                     app:iconGravity="textStart"
-                    app:iconTint="@color/on_primary" />
+                    app:iconTint="?attr/colorOnPrimary" />
 
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Card 2: Manual Form -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/surface_card"
-            app:cardCornerRadius="16dp"
+            android:layout_marginBottom="@dimen/page_margin"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
             app:cardElevation="0dp"
-            app:strokeColor="@color/card_stroke"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -101,24 +96,16 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     android:text="管控连接参数"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface" />
 
-                <!-- Panel URL -->
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:boxStrokeColor="@color/primary"
-                    app:hintTextColor="@color/primary"
                     app:startIconDrawable="@drawable/ic_globe"
-                    app:startIconTint="@color/text_secondary"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    app:startIconTint="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etPanelUrl"
@@ -126,24 +113,17 @@
                         android:layout_height="wrap_content"
                         android:hint="Panel 基础地址 (https://...)"
                         android:inputType="textUri"
-                        android:textSize="14sp" />
+                        android:minHeight="48dp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Node ID -->
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:boxStrokeColor="@color/primary"
-                    app:hintTextColor="@color/primary"
                     app:startIconDrawable="@drawable/ic_router"
-                    app:startIconTint="@color/text_secondary"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    app:startIconTint="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etNodeId"
@@ -151,37 +131,29 @@
                         android:layout_height="wrap_content"
                         android:hint="节点 ID (如 android-node-01)"
                         android:inputType="text"
-                        android:textSize="14sp" />
+                        android:minHeight="48dp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Token -->
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="18dp"
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:boxStrokeColor="@color/primary"
+                    android:layout_marginBottom="16dp"
                     app:endIconMode="password_toggle"
-                    app:hintTextColor="@color/primary"
                     app:startIconDrawable="@drawable/ic_key"
-                    app:startIconTint="@color/text_secondary"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    app:startIconTint="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etToken"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="控制令牌 / 15分钟注册令牌"
+                        android:hint="@string/token_hint"
                         android:inputType="textPassword"
-                        android:textSize="14sp" />
+                        android:minHeight="48dp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Action Buttons -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -189,25 +161,21 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnEnroll"
-                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
                         android:layout_marginEnd="8dp"
                         android:layout_weight="1"
-                        android:text="一键注册 (Enroll)"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        app:cornerRadius="10dp" />
+                        android:minHeight="48dp"
+                        android:text="@string/btn_enroll" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSaveConfig"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="保存配置"
-                        android:textSize="14sp"
-                        app:cornerRadius="10dp" />
+                        android:minHeight="48dp"
+                        android:text="保存配置" />
 
                 </LinearLayout>
 
@@ -215,14 +183,13 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Card 3: System Options -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/surface_card"
-            app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
             app:cardElevation="0dp"
-            app:strokeColor="@color/card_stroke"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -234,37 +201,39 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="8dp"
                     android:text="运行与保活策略"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchAutoStart"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="开机自动启动 Agent"
-                    android:textSize="14sp" />
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginTop="10dp"
-                    android:layout_marginBottom="10dp"
-                    android:background="@color/card_stroke" />
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="?attr/colorOutlineVariant" />
 
                 <LinearLayout
                     android:id="@+id/layoutBatteryOpt"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?selectableItemBackground"
+                    android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
+                    android:minHeight="48dp"
                     android:orientation="horizontal"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp">
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp">
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -276,28 +245,126 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="忽略系统电池优化白名单"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp" />
+                            android:textAppearance="?attr/textAppearanceBodyLarge"
+                            android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="防止息屏或低电量时系统 Doze 模式断开网络长连接"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvBatteryOptAction"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="前往设置 ›"
-                        android:textColor="@color/primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:text="前往设置"
+                        android:textAppearance="?attr/textAppearanceLabelLarge"
+                        android:textColor="?attr/colorPrimary" />
 
                 </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCurrentConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/page_margin"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+            app:cardCornerRadius="@dimen/shape_corner_extra_large"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_terminal"
+                        app:tint="?attr/colorPrimary" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="下发节点配置"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tvConfigStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="从 Panel 同步的运行时配置 (current.json)"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRefreshConfig"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="刷新配置"
+                        app:icon="@drawable/ic_refresh"
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCopyConfig"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="复制配置"
+                        app:icon="@drawable/ic_copy"
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="?attr/colorSurfaceContainerLowest"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/tvCurrentConfigContent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:lineSpacingMultiplier="1.15"
+                        android:text="暂无下发的节点配置"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textIsSelectable="true"
+                        android:textSize="12sp" />
+
+                </HorizontalScrollView>
 
             </LinearLayout>
 

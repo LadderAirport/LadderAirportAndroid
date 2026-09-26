@@ -19,6 +19,7 @@ import (
 	"github.com/ladderairport/agent/internal/uplink"
 	"github.com/ladderairport/agent/internal/uplinkws"
 	"github.com/ladderairport/agent/internal/version"
+	agentv1 "github.com/ladderairport/proto/gen/go/agent/v1"
 	_ "github.com/sagernet/gomobile/bind"
 )
 
@@ -41,6 +42,7 @@ type Config struct {
 	UplinkWS   bool   `json:"uplink_ws"`
 	ReportSecs int    `json:"report_secs"`
 	ConfigSecs int    `json:"config_secs"`
+	Version    string `json:"version,omitempty"`
 }
 
 // Runner drives the agent lifecycle on Android (uplink-ws + in-process sing-box).
@@ -98,6 +100,9 @@ func NewRunner(cfgJSON string, host Host) (*Runner, error) {
 	if cfg.ConfigSecs <= 0 {
 		cfg.ConfigSecs = 60
 	}
+	if strings.TrimSpace(cfg.Version) == "" {
+		cfg.Version = version.Version
+	}
 
 	return &Runner{
 		cfg:       cfg,
@@ -135,11 +140,73 @@ func (r *Runner) Start() error {
 	log.SetOutput(io.MultiWriter(os.Stderr, logs.Writer("info"), r.logWriter))
 
 	singboxVer := control.SingboxVersion()
-	agentVer := version.Version
+	agentVer := r.cfg.Version
 	srv := control.NewServer(rt, agentVer, singboxVer, logs)
 	srv.SetDataDir(r.cfg.DataDir)
 	resolver := control.NewPublicAddressResolver()
 	srv.SetPublicAddressResolver(resolver)
+
+	if r.host != nil {
+		srv.SetInterfacesProvider(func() ([]*agentv1.NetworkInterface, error) {
+			raw := r.host.InterfacesJSON()
+			if strings.TrimSpace(raw) == "" {
+				return nil, fmt.Errorf("host interfacesJSON 为空")
+			}
+			var list []struct {
+				Name         string   `json:"name"`
+				Up           bool     `json:"up"`
+				Loopback     bool     `json:"loopback"`
+				Mtu          int32    `json:"mtu"`
+				HardwareAddr string   `json:"hardware_addr"`
+				Addresses    []string `json:"addresses"`
+			}
+			if err := json.Unmarshal([]byte(raw), &list); err != nil {
+				return nil, fmt.Errorf("解析 host interfacesJSON 失败: %w", err)
+			}
+			out := make([]*agentv1.NetworkInterface, 0, len(list))
+			for _, item := range list {
+				out = append(out, &agentv1.NetworkInterface{
+					Name:         item.Name,
+					Up:           item.Up,
+					Loopback:     item.Loopback,
+					Mtu:          item.Mtu,
+					HardwareAddr: item.HardwareAddr,
+					Addresses:    item.Addresses,
+				})
+			}
+			return out, nil
+		})
+
+		srv.SetNodeMetricsProvider(func() (*agentv1.GetNodeMetricsResponse, error) {
+			raw := r.host.NodeMetricsJSON()
+			if strings.TrimSpace(raw) == "" {
+				return nil, fmt.Errorf("host nodeMetricsJSON 为空")
+			}
+			var m struct {
+				CpuPercent       float64 `json:"cpu_percent"`
+				MemoryTotalBytes uint64  `json:"memory_total_bytes"`
+				MemoryUsedBytes  uint64  `json:"memory_used_bytes"`
+				DiskTotalBytes   uint64  `json:"disk_total_bytes"`
+				DiskUsedBytes    uint64  `json:"disk_used_bytes"`
+				DownlinkBps      uint64  `json:"downlink_bps"`
+				UplinkBps        uint64  `json:"uplink_bps"`
+				CollectedAtUnix  int64   `json:"collected_at_unix"`
+			}
+			if err := json.Unmarshal([]byte(raw), &m); err != nil {
+				return nil, fmt.Errorf("解析 host nodeMetricsJSON 失败: %w", err)
+			}
+			return &agentv1.GetNodeMetricsResponse{
+				CpuPercent:       m.CpuPercent,
+				MemoryTotalBytes: m.MemoryTotalBytes,
+				MemoryUsedBytes:  m.MemoryUsedBytes,
+				DiskTotalBytes:   m.DiskTotalBytes,
+				DiskUsedBytes:    m.DiskUsedBytes,
+				UplinkBps:        m.UplinkBps,
+				DownlinkBps:      m.DownlinkBps,
+				CollectedAtUnix:  m.CollectedAtUnix,
+			}, nil
+		})
+	}
 
 	protocolCerts, err := protocolcert.New(filepath.Join(r.cfg.DataDir, "protocol-certs"))
 	if err == nil {
@@ -245,7 +312,7 @@ func (r *Runner) StatusJSON() string {
 	info := StatusInfo{
 		Running:        r.running,
 		State:          "stopped",
-		AgentVersion:   version.Version,
+		AgentVersion:   r.cfg.Version,
 		SingboxVersion: control.SingboxVersion(),
 		PanelURL:       r.cfg.PanelURL,
 		NodeID:         r.cfg.NodeID,

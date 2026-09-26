@@ -6,22 +6,22 @@
     android:background="@color/terminal_bg"
     android:orientation="vertical">
 
-    <!-- Terminal Action Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/terminal_header"
         android:gravity="center_vertical"
+        android:minHeight="48dp"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="10dp">
+        android:paddingStart="@dimen/page_margin"
+        android:paddingEnd="4dp">
 
         <View
             android:layout_width="8dp"
             android:layout_height="8dp"
-            android:background="@color/status_running" />
+            android:background="@drawable/bg_status_dot"
+            android:backgroundTint="@color/status_running"
+            android:importantForAccessibility="no" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -29,20 +29,18 @@
             android:layout_marginStart="8dp"
             android:fontFamily="monospace"
             android:text="CONSOLE LOGS"
-            android:textColor="@color/terminal_accent"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="@color/terminal_accent" />
 
         <TextView
             android:id="@+id/tvLogCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:background="@drawable/ic_stat_agent"
             android:fontFamily="monospace"
             android:text="0 lines"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="@color/terminal_muted" />
 
         <View
             android:layout_width="0dp"
@@ -52,16 +50,18 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCopyLogs"
             style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/cd_copy_logs"
             app:icon="@drawable/ic_copy"
             app:iconTint="@color/terminal_text" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnClearLogs"
             style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/cd_clear_logs"
             app:icon="@drawable/ic_delete"
             app:iconTint="@color/terminal_text" />
 
@@ -70,13 +70,13 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#334155" />
+        android:background="@color/terminal_divider" />
 
-    <!-- Terminal Text Area -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollLogs"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:padding="12dp">
 
         <TextView
@@ -86,8 +86,8 @@
             android:fontFamily="monospace"
             android:lineSpacingExtra="3dp"
             android:text="等待日志输出..."
-            android:textColor="@color/terminal_text"
-            android:textSize="12sp" />
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="@color/terminal_text" />
 
     </androidx.core.widget.NestedScrollView>
 

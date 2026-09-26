@@ -60,6 +60,7 @@ class AgentService : Service(), Host {
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    private val isStarting = java.util.concurrent.atomic.AtomicBoolean(false)
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var statusMonitorJob: Job? = null
     private val gson = Gson()
@@ -79,7 +80,6 @@ class AgentService : Service(), Host {
         when (intent?.action) {
             ACTION_STOP -> {
                 stopAgent()
-                stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_START, null -> {
@@ -90,12 +90,11 @@ class AgentService : Service(), Host {
     }
 
     private fun startAgent() {
-        if (isServiceRunning.value == true) return
-
-        wakeLock?.acquire(24 * 60 * 60 * 1000L) // 24 hours max safety wake lock
-
-        val notification = buildNotification("正在启动 Agent...")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // Must call startForeground unconditionally to avoid ForegroundServiceDidNotStartInTimeException
+        val notification = buildNotification(
+            if (isServiceRunning.value == true) "Agent 运行中" else "正在启动 Agent..."
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
@@ -103,6 +102,14 @@ class AgentService : Service(), Host {
             )
         } else {
             startForeground(NOTIFICATION_ID, notification)
+        }
+
+        if (isServiceRunning.value == true || isStarting.getAndSet(true)) return
+
+        wakeLock?.let {
+            if (!it.isHeld) {
+                it.acquire(24 * 60 * 60 * 1000L) // 24 hours max safety wake lock
+            }
         }
 
         serviceScope.launch {
@@ -137,8 +144,13 @@ class AgentService : Service(), Host {
                 )
                 currentStatus.postValue(errStatus)
                 isServiceRunning.postValue(false)
+                wakeLock?.let {
+                    if (it.isHeld) it.release()
+                }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
+            } finally {
+                isStarting.set(false)
             }
         }
     }
@@ -147,18 +159,24 @@ class AgentService : Service(), Host {
         statusMonitorJob?.cancel()
         statusMonitorJob = null
 
+        val currentRunner = runner
+        runner = null
+
         serviceScope.launch {
             try {
-                runner?.stop()
-                runner = null
+                currentRunner?.stop()
                 LadderApplication.appendLog("Agent 已正常停止")
             } catch (e: Exception) {
                 LadderApplication.appendLog("停止 Agent 出现异常: ${e.message}")
             } finally {
-                isServiceRunning.postValue(false)
-                currentStatus.postValue(AgentStatus(running = false, state = "stopped"))
-                wakeLock?.let {
-                    if (it.isHeld) it.release()
+                withContext(NonCancellable) {
+                    isServiceRunning.postValue(false)
+                    currentStatus.postValue(AgentStatus(running = false, state = "stopped"))
+                    wakeLock?.let {
+                        if (it.isHeld) it.release()
+                    }
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
                 }
             }
         }
@@ -239,6 +257,7 @@ class AgentService : Service(), Host {
             .setSmallIcon(R.drawable.ic_stat_agent)
             .setContentIntent(pendingActivity)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .addAction(0, "停止", pendingStop)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -276,7 +295,19 @@ class AgentService : Service(), Host {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopAgent()
+        statusMonitorJob?.cancel()
+        statusMonitorJob = null
+        val currentRunner = runner
+        runner = null
+        if (currentRunner != null) {
+            try {
+                currentRunner.stop()
+            } catch (_: Exception) {}
+        }
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
         networkCallback?.let {
             try {
                 connectivityManager?.unregisterNetworkCallback(it)
@@ -288,10 +319,10 @@ class AgentService : Service(), Host {
     private fun formatBytes(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
         val kb = bytes / 1024.0
-        if (kb < 1024) return String.format("%.1f KB", kb)
+        if (kb < 1024) return String.format(java.util.Locale.US, "%.1f KB", kb)
         val mb = kb / 1024.0
-        if (mb < 1024) return String.format("%.1f MB", mb)
+        if (mb < 1024) return String.format(java.util.Locale.US, "%.1f MB", mb)
         val gb = mb / 1024.0
-        return String.format("%.2f GB", gb)
+        return String.format(java.util.Locale.US, "%.2f GB", gb)
     }
 }

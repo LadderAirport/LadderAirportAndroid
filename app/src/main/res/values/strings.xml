@@ -15,6 +15,8 @@
     <string name="battery_opt_title">忽略电池优化</string>
     <string name="logs_title">实时日志</string>
     <string name="clear_logs">清除</string>
+    <string name="cd_copy_logs">复制日志</string>
+    <string name="cd_clear_logs">清除日志</string>
     <string name="traffic_stat">上行: %1$s | 下行: %2$s</string>
     <string name="connections_stat">连接数: %1$d | 运行时间: %2$s</string>
 </resources>

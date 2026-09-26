@@ -6,7 +6,6 @@ require (
 	github.com/ladderairport/agent v0.0.0
 	github.com/ladderairport/proto v0.0.0
 	github.com/sagernet/gomobile v0.1.8
-	google.golang.org/grpc v1.82.0
 )
 
 require (
@@ -155,6 +154,7 @@ require (
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173 // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/grpc v1.82.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -166,11 +166,11 @@ require (
 )
 
 replace (
-	github.com/fatedier/frp => /home/jlan/LadderAirport/agent/frp
+	github.com/fatedier/frp => ../LadderAirport/agent/frp
 	github.com/hashicorp/yamux => github.com/fatedier/yamux v0.0.0-20250825093530-d0154be01cd6
-	github.com/ladderairport/agent => /home/jlan/LadderAirport/agent
-	github.com/ladderairport/pkg => /home/jlan/LadderAirport/pkg
-	github.com/ladderairport/proto => /home/jlan/LadderAirport/proto
-	github.com/sagernet/sing-box => /home/jlan/LadderAirport/agent/sing-box
+	github.com/ladderairport/agent => ../LadderAirport/agent
+	github.com/ladderairport/pkg => ../LadderAirport/pkg
+	github.com/ladderairport/proto => ../LadderAirport/proto
+	github.com/sagernet/sing-box => ../LadderAirport/agent/sing-box
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260414002931-afd174a4e478
 )
