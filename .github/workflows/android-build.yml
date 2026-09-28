@@ -1,8 +1,9 @@
-name: Android CI
+name: Android CI/CD
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -19,16 +20,19 @@ env:
 
 jobs:
   build:
-    name: Build arm64 AAR and debug APK
+    name: Build arm64 + x86_64
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      is_release: ${{ steps.meta.outputs.is_release }}
     steps:
       - name: Checkout Android
         uses: actions/checkout@v5
         with:
           path: android
           fetch-depth: 0
-          # LadderAirport is a git submodule of this repo; nested sing-box/frp
-          # needed for build. Skip sing-box clients/* (android/apple) below.
+          # LadderAirport is a git submodule; nested sing-box/frp needed for build.
+          # Skip sing-box clients/* (android/apple).
           submodules: false
 
       - name: Init LadderAirport submodule (agent deps only)
@@ -40,6 +44,30 @@ jobs:
           test -f LadderAirport/agent/go.mod
           test -d LadderAirport/agent/sing-box
           test -d LadderAirport/agent/frp
+
+      - name: Resolve version metadata
+        id: meta
+        working-directory: android
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+            IS_RELEASE=true
+          else
+            VERSION="$(git -C LadderAirport describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)-$(git rev-parse --short HEAD)"
+            IS_RELEASE=false
+          fi
+          # versionCode: strip leading v / non-digits, fall back to run number
+          RAW="${VERSION#v}"
+          VERSION_CODE="$(echo "${RAW}" | awk -F. '{print ($1+0)*10000+($2+0)*100+($3+0)}')"
+          if [[ -z "${VERSION_CODE}" || "${VERSION_CODE}" == "0" ]]; then
+            VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "is_release=${IS_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Building version=${VERSION} versionCode=${VERSION_CODE} release=${IS_RELEASE}"
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -72,22 +100,147 @@ jobs:
           go install github.com/sagernet/gomobile/cmd/gobind@v0.1.8
           gomobile init
 
-      - name: Build AAR
+      - name: Build AAR (arm64 + amd64)
         working-directory: android
-        run: make aar
+        run: make aar ANDROID_TARGETS=android/arm64,android/amd64
 
       - name: Unit tests
         working-directory: android
         run: ./gradlew test --stacktrace
 
-      - name: Build debug APK
+      - name: Build debug APKs (per-ABI)
+        if: steps.meta.outputs.is_release != 'true'
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug --stacktrace \
+            -PVERSION_NAME="${{ steps.meta.outputs.version_name }}" \
+            -PVERSION_CODE="${{ steps.meta.outputs.version_code }}"
 
-      - name: Upload debug APK
+      - name: Prepare release signing
+        if: steps.meta.outputs.is_release == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="${RUNNER_TEMP}/ladderairport-release.jks"
+          if [[ -n "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${KEYSTORE_PATH}"
+            echo "Using repository release keystore"
+          else
+            # Fallback so GitHub Release APKs are installable without secrets.
+            keytool -genkeypair -v \
+              -keystore "${KEYSTORE_PATH}" \
+              -alias ladderairport \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=LadderAirport CI, OU=CI, O=LadderAirport, L=Internet, ST=NA, C=US"
+            echo "ANDROID_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=ladderairport" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "WARNING: signed with ephemeral CI keystore (set ANDROID_KEYSTORE_* secrets for stable signing)"
+          fi
+          echo "ANDROID_KEYSTORE_PATH=${KEYSTORE_PATH}" >> "$GITHUB_ENV"
+          if [[ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
+            echo "ANDROID_KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}" >> "$GITHUB_ENV"
+          fi
+          if [[ -n "${ANDROID_KEY_ALIAS:-}" ]]; then
+            echo "ANDROID_KEY_ALIAS=${ANDROID_KEY_ALIAS}" >> "$GITHUB_ENV"
+          fi
+          if [[ -n "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "ANDROID_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release APKs (per-ABI)
+        if: steps.meta.outputs.is_release == 'true'
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --stacktrace \
+            -PVERSION_NAME="${{ steps.meta.outputs.version_name }}" \
+            -PVERSION_CODE="${{ steps.meta.outputs.version_code }}"
+
+      - name: Collect artifacts
+        id: collect
+        working-directory: android
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          VERSION="${{ steps.meta.outputs.version }}"
+          if [[ "${{ steps.meta.outputs.is_release }}" == "true" ]]; then
+            SRC=app/build/outputs/apk/release
+            VARIANT=release
+          else
+            SRC=app/build/outputs/apk/debug
+            VARIANT=debug
+          fi
+          for abi in arm64-v8a x86_64; do
+            # Prefer signed; fall back to unsigned naming.
+            src=$(ls "${SRC}"/app-${abi}-${VARIANT}*.apk 2>/dev/null | head -n1 || true)
+            if [[ -z "${src}" ]]; then
+              echo "Missing APK for ${abi} under ${SRC}" >&2
+              ls -laR app/build/outputs/apk || true
+              exit 1
+            fi
+            dest="dist/LadderAirportAndroid-${VERSION}-${abi}.apk"
+            cp "${src}" "${dest}"
+            echo "Collected ${dest} <- ${src}"
+          done
+          ls -la dist/
+
+      - name: Upload arm64-v8a APK
         uses: actions/upload-artifact@v4
         with:
-          name: ladderairport-android-arm64-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: LadderAirportAndroid-${{ steps.meta.outputs.version }}-arm64-v8a
+          path: android/dist/LadderAirportAndroid-${{ steps.meta.outputs.version }}-arm64-v8a.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LadderAirportAndroid-${{ steps.meta.outputs.version }}-x86_64
+          path: android/dist/LadderAirportAndroid-${{ steps.meta.outputs.version }}-x86_64.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: needs.build.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download arm64-v8a APK
+        uses: actions/download-artifact@v4
+        with:
+          name: LadderAirportAndroid-${{ needs.build.outputs.version }}-arm64-v8a
+          path: release-assets
+
+      - name: Download x86_64 APK
+        uses: actions/download-artifact@v4
+        with:
+          name: LadderAirportAndroid-${{ needs.build.outputs.version }}-x86_64
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.version }}
+          name: LadderAirport Android ${{ needs.build.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release-assets/LadderAirportAndroid-${{ needs.build.outputs.version }}-arm64-v8a.apk
+            release-assets/LadderAirportAndroid-${{ needs.build.outputs.version }}-x86_64.apk
+          body: |
+            ## Android packages
+
+            | ABI | File | Typical devices |
+            |-----|------|-----------------|
+            | `arm64-v8a` | `LadderAirportAndroid-${{ needs.build.outputs.version }}-arm64-v8a.apk` | phones / tablets / most TV boxes |
+            | `x86_64` | `LadderAirportAndroid-${{ needs.build.outputs.version }}-x86_64.apk` | emulators / x86_64 devices |
+
+            Requires Panel **v0.15.7+**.

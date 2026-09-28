@@ -3,6 +3,8 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def abiVersionCodes = ['arm64-v8a': 1, 'x86_64': 2]
+
 android {
     namespace 'io.ladderairport.agent'
     compileSdk 35
@@ -12,11 +14,32 @@ android {
         applicationId "io.ladderairport.agent"
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName "1.0.0"
+        versionCode Integer.parseInt(project.findProperty('VERSION_CODE') ?: '1')
+        versionName project.findProperty('VERSION_NAME') ?: '1.0.0'
 
         ndk {
             abiFilters 'arm64-v8a', 'x86_64'
+        }
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'x86_64'
+            universalApk false
+        }
+    }
+
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (keystorePath && file(keystorePath).exists()) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
         }
     }
 
@@ -24,6 +47,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true
@@ -45,6 +71,16 @@ android {
     packaging {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def abi = output.getFilter(com.android.build.OutputFile.ABI)
+            if (abi != null && abiVersionCodes.containsKey(abi)) {
+                output.versionCodeOverride =
+                        defaultConfig.versionCode * 10 + abiVersionCodes[abi]
+            }
         }
     }
 }

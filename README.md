@@ -47,16 +47,37 @@ make check-src
 # 编译 Go AAR
 make aar
 
-# 编译 Debug APK
+# 编译 Debug APK（按 ABI 分包）
 make assemble
-# app/build/outputs/apk/debug/app-debug.apk
+# app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+# app/build/outputs/apk/debug/app-x86_64-debug.apk
 
-# 编译 Release APK
+# 编译 Release APK（按 ABI 分包；配置 ANDROID_KEYSTORE_* 后会签名）
 make release
-# app/build/outputs/apk/release/app-release-unsigned.apk
+# app/build/outputs/apk/release/app-arm64-v8a-release.apk
+# app/build/outputs/apk/release/app-x86_64-release.apk
 ```
 
-`make test` 跑 Android 单元测试。CI 会初始化 `LadderAirport` 子模块（仅拉取必要的 `agent/frp` 与 `agent/sing-box`），用 `with_quic,with_utls,with_android` 编 AAR，再编 debug APK 并上传产物。
+`make test` 跑 Android 单元测试。
+
+## CI/CD（GitHub Actions）
+
+Workflow：`.github/workflows/android-build.yml`
+
+| 触发 | 行为 |
+|------|------|
+| `push` / `pull_request` → `main` | 初始化 submodule → gomobile AAR（arm64 + amd64）→ 单测 → 分别上传 `arm64-v8a` / `x86_64` debug APK |
+| 推送 tag `v*`（如 `v1.0.0`） | 同上，并打 **signed release APK**，创建 GitHub Release 挂上两个架构产物 |
+| `workflow_dispatch` | 手动跑一轮 CI |
+
+发布签名（可选，仓库 Secrets）：
+
+- `ANDROID_KEYSTORE_BASE64` — keystore 文件的 base64
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+未配置 Secrets 时，tag 发布会用一次性 CI keystore 签名（可安装，但与正式包签名不同）。
 
 ## 目录
 
