@@ -9,6 +9,10 @@
         android:icon="@drawable/ic_settings"
         android:title="节点配置" />
     <item
+        android:id="@+id/nav_proxy"
+        android:icon="@drawable/ic_proxy"
+        android:title="代理" />
+    <item
         android:id="@+id/nav_logs"
         android:icon="@drawable/ic_terminal"
         android:title="运行日志" />

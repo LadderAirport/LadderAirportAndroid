@@ -16,6 +16,7 @@ class PreferencesHelper(context: Context) {
         private const val KEY_REPORT_SECS = "report_secs"
         private const val KEY_CONFIG_SECS = "config_secs"
         private const val KEY_ENROLLED = "enrolled"
+        private const val KEY_CLIENT_SUB_URL = "client_sub_url"
     }
 
     var panelUrl: String
@@ -47,7 +48,16 @@ class PreferencesHelper(context: Context) {
         get() = prefs.getBoolean(KEY_ENROLLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENROLLED, value).apply()
 
+    /** Ladder subscription URL for the local sing-box VPN client. */
+    var clientSubUrl: String
+        get() = prefs.getString(KEY_CLIENT_SUB_URL, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_CLIENT_SUB_URL, value.trim()).apply()
+
     fun isConfigured(): Boolean {
         return panelUrl.isNotBlank() && nodeId.isNotBlank() && token.isNotBlank()
+    }
+
+    fun isClientConfigured(): Boolean {
+        return clientSubUrl.isNotBlank()
     }
 }

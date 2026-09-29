@@ -9,12 +9,15 @@ import io.ladderairport.agent.service.AgentService
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
-            val prefs = LadderApplication.instance.prefs
-            if (prefs.autoStart && prefs.isConfigured()) {
-                LadderApplication.appendLog("收到开机自启广播，正在启动 Agent...")
-                AgentService.start(context)
-            }
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != "android.intent.action.QUICKBOOT_POWERON"
+        ) {
+            return
+        }
+        val prefs = LadderApplication.instance.prefs
+        if (prefs.autoStart && prefs.isConfigured() && prefs.enrolled) {
+            LadderApplication.appendLog("开机自启：启动 Agent")
+            AgentService.start(context)
         }
     }
 }

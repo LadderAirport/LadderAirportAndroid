@@ -38,9 +38,12 @@ import io.ladderairport.agent.databinding.ActivityMainBinding
 import io.ladderairport.agent.databinding.PageConfigBinding
 import io.ladderairport.agent.databinding.PageDashboardBinding
 import io.ladderairport.agent.databinding.PageLogsBinding
+import io.ladderairport.agent.databinding.PageProxyBinding
 import io.ladderairport.agent.mobile.Mobile
 import io.ladderairport.agent.model.AgentStatus
 import io.ladderairport.agent.service.AgentService
+import io.ladderairport.agent.service.ClientVpnService
+import io.ladderairport.agent.util.JsonTreeView
 import io.ladderairport.agent.util.QrCodeParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,16 +53,37 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.app.Activity
+import android.net.VpnService
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import com.google.android.material.button.MaterialButton
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var dashboardBinding: PageDashboardBinding
     private lateinit var configBinding: PageConfigBinding
+    private lateinit var proxyBinding: PageProxyBinding
     private lateinit var logsBinding: PageLogsBinding
 
     private val prefs by lazy { LadderApplication.instance.prefs }
     private var lastConfigHash: String = ""
+    private var suppressConnectSwitch = false
+    private var cachedConfigCopyText: String = ""
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            ClientVpnService.start(this)
+        } else {
+            suppressConnectSwitch = true
+            proxyBinding.switchConnect.isChecked = false
+            suppressConnectSwitch = false
+            Toast.makeText(this, "需要 VPN 授权才能连接", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -95,11 +119,13 @@ class MainActivity : AppCompatActivity() {
 
         dashboardBinding = PageDashboardBinding.inflate(layoutInflater, binding.viewPager, false)
         configBinding = PageConfigBinding.inflate(layoutInflater, binding.viewPager, false)
+        proxyBinding = PageProxyBinding.inflate(layoutInflater, binding.viewPager, false)
         logsBinding = PageLogsBinding.inflate(layoutInflater, binding.viewPager, false)
 
         setupNavigation()
         initDashboard()
         initConfig()
+        initProxy()
         initLogs()
         observeData()
         checkPermissions()
@@ -114,6 +140,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadCurrentConfigDisplay()
+        refreshProxyOutboundsUi()
         if (prefs.autoStart && prefs.isConfigured() && prefs.enrolled) {
             if (AgentService.isServiceRunning.value != true) {
                 AgentService.start(this)
@@ -139,15 +166,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        val adapter = MainPagerAdapter(dashboardBinding, configBinding, logsBinding)
+        val adapter = MainPagerAdapter(dashboardBinding, configBinding, proxyBinding, logsBinding)
         binding.viewPager.adapter = adapter
-        binding.viewPager.offscreenPageLimit = 2
+        binding.viewPager.offscreenPageLimit = 3
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_dashboard -> binding.viewPager.currentItem = 0
                 R.id.nav_config -> binding.viewPager.currentItem = 1
-                R.id.nav_logs -> binding.viewPager.currentItem = 2
+                R.id.nav_proxy -> binding.viewPager.currentItem = 2
+                R.id.nav_logs -> binding.viewPager.currentItem = 3
             }
             true
         }
@@ -160,7 +188,11 @@ class MainActivity : AppCompatActivity() {
                         binding.bottomNav.selectedItemId = R.id.nav_config
                         loadCurrentConfigDisplay()
                     }
-                    2 -> binding.bottomNav.selectedItemId = R.id.nav_logs
+                    2 -> {
+                        binding.bottomNav.selectedItemId = R.id.nav_proxy
+                        refreshProxyOutboundsUi()
+                    }
+                    3 -> binding.bottomNav.selectedItemId = R.id.nav_logs
                 }
             }
         })
@@ -268,8 +300,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         configBinding.btnCopyConfig.setOnClickListener {
-            val text = configBinding.tvCurrentConfigContent.text?.toString().orEmpty()
-            if (text.isNotBlank() && !text.startsWith("暂未")) {
+            val text = cachedConfigCopyText
+            if (text.isNotBlank()) {
                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("LadderAirport Config", text))
                 Toast.makeText(this, "节点配置已复制到剪贴板", Toast.LENGTH_SHORT).show()
@@ -280,30 +312,292 @@ class MainActivity : AppCompatActivity() {
         loadCurrentConfigDisplay()
     }
 
+    private fun initProxy() {
+        proxyBinding.etSubUrl.setText(prefs.clientSubUrl)
+        suppressConnectSwitch = true
+        proxyBinding.switchConnect.isChecked = ClientVpnService.isServiceRunning.value == true
+        suppressConnectSwitch = false
+
+        proxyBinding.btnSaveSub.setOnClickListener {
+            val url = proxyBinding.etSubUrl.text?.toString().orEmpty()
+            try {
+                val normalized = Mobile.normalizeSubURL(url)
+                prefs.clientSubUrl = normalized
+                proxyBinding.etSubUrl.setText(normalized)
+                proxyBinding.tvSubError.visibility = View.GONE
+                Toast.makeText(this, "订阅链接已保存", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                proxyBinding.tvSubError.visibility = View.VISIBLE
+                proxyBinding.tvSubError.text = e.message
+            }
+        }
+
+        proxyBinding.btnRefreshSub.setOnClickListener {
+            refreshSubscription()
+        }
+
+        proxyBinding.switchConnect.setOnCheckedChangeListener { _, checked ->
+            if (suppressConnectSwitch) return@setOnCheckedChangeListener
+            if (checked) {
+                maybeStartClientVpn()
+            } else {
+                ClientVpnService.stop(this)
+            }
+        }
+
+        refreshProxyOutboundsUi()
+    }
+
+    private fun maybeStartClientVpn() {
+        val url = proxyBinding.etSubUrl.text?.toString()?.takeIf { it.isNotBlank() }
+            ?: prefs.clientSubUrl
+        if (url.isBlank()) {
+            suppressConnectSwitch = true
+            proxyBinding.switchConnect.isChecked = false
+            suppressConnectSwitch = false
+            Toast.makeText(this, "请先填写订阅链接", Toast.LENGTH_SHORT).show()
+            binding.viewPager.currentItem = 2
+            return
+        }
+        try {
+            prefs.clientSubUrl = Mobile.normalizeSubURL(url)
+            proxyBinding.etSubUrl.setText(prefs.clientSubUrl)
+        } catch (e: Exception) {
+            suppressConnectSwitch = true
+            proxyBinding.switchConnect.isChecked = false
+            suppressConnectSwitch = false
+            proxyBinding.tvSubError.visibility = View.VISIBLE
+            proxyBinding.tvSubError.text = e.message
+            return
+        }
+
+        val prepare = VpnService.prepare(this)
+        if (prepare != null) {
+            vpnPermissionLauncher.launch(prepare)
+        } else {
+            ClientVpnService.start(this)
+        }
+    }
+
+    private fun refreshSubscription() {
+        val url = proxyBinding.etSubUrl.text?.toString().orEmpty().ifBlank { prefs.clientSubUrl }
+        if (url.isBlank()) {
+            Toast.makeText(this, "请先填写订阅链接", Toast.LENGTH_SHORT).show()
+            return
+        }
+        proxyBinding.btnRefreshSub.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val normalized = withContext(Dispatchers.IO) {
+                    val n = Mobile.normalizeSubURL(url)
+                    prefs.clientSubUrl = n
+                    val cfg = JSONObject().apply {
+                        put("sub_url", n)
+                        put("data_dir", filesDir.absolutePath)
+                    }.toString()
+                    // Use a throwaway runner without TunHost only for fetch — TunHost required by constructor.
+                    // Fetch via temporary ClientRunner with a no-op TunHost is awkward; call through service if running,
+                    // otherwise create runner with stub that rejects OpenTun.
+                    val runner = Mobile.newClientRunner(cfg, object : io.ladderairport.agent.mobile.Host {
+                        override fun writeLog(line: String?) {
+                            if (!line.isNullOrBlank()) LadderApplication.appendLog(line)
+                        }
+                        override fun nodeMetricsJSON(): String = "{}"
+                        override fun interfacesJSON(): String = "[]"
+                    }, object : io.ladderairport.agent.mobile.TunHost {
+                        override fun openTun(optionsJSON: String?): Int {
+                            throw IllegalStateException("fetch-only")
+                        }
+                        override fun protect(fd: Int) {}
+                    })
+                    runner.fetchSub()
+                    runner.outboundsJSON()
+                }
+                prefs.clientSubUrl = Mobile.normalizeSubURL(url)
+                proxyBinding.etSubUrl.setText(prefs.clientSubUrl)
+                proxyBinding.tvSubError.visibility = View.GONE
+                ClientVpnService.outboundsJSON.postValue(normalized)
+                renderOutbounds(normalized)
+                Toast.makeText(this@MainActivity, "订阅已更新", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                proxyBinding.tvSubError.visibility = View.VISIBLE
+                proxyBinding.tvSubError.text = e.message
+                Toast.makeText(this@MainActivity, "更新失败: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                proxyBinding.btnRefreshSub.isEnabled = true
+            }
+        }
+    }
+
+    private fun refreshProxyOutboundsUi() {
+        val cached = File(filesDir, "client/meta.json")
+        if (cached.exists()) {
+            try {
+                val meta = JSONObject(cached.readText())
+                val fetchedAt = meta.optLong("fetched_at_unix", 0)
+                val count = meta.optJSONArray("outbound_tags")?.length() ?: 0
+                val time = if (fetchedAt > 0) {
+                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(fetchedAt * 1000))
+                } else {
+                    "未知"
+                }
+                proxyBinding.tvSubMeta.text = "上次更新: $time · $count 个节点"
+            } catch (_: Exception) {
+                proxyBinding.tvSubMeta.text = "本地有缓存"
+            }
+        } else {
+            proxyBinding.tvSubMeta.text = "尚未更新订阅"
+        }
+        val json = ClientVpnService.outboundsJSON.value
+        if (!json.isNullOrBlank() && json != """{"tags":[],"selected":""}""") {
+            renderOutbounds(json)
+            return
+        }
+        val current = File(filesDir, "client/current.json")
+        if (current.exists()) {
+            try {
+                val tags = mutableListOf<String>()
+                val root = JSONObject(current.readText())
+                val outbounds = root.optJSONArray("outbounds") ?: return
+                for (i in 0 until outbounds.length()) {
+                    val ob = outbounds.optJSONObject(i) ?: continue
+                    val type = ob.optString("type")
+                    val tag = ob.optString("tag")
+                    if (tag.isBlank() || tag == "proxy") continue
+                    if (type in setOf("selector", "urltest", "direct", "block", "dns", "reject")) continue
+                    tags.add(tag)
+                }
+                val selected = try {
+                    JSONObject(File(filesDir, "client/meta.json").readText()).optString("selected_tag", "")
+                } catch (_: Exception) { "" }
+                val payload = JSONObject().apply {
+                    put("tags", org.json.JSONArray(tags))
+                    put("selected", selected)
+                }.toString()
+                renderOutbounds(payload)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun renderOutbounds(json: String) {
+        try {
+            val obj = JSONObject(json)
+            val tagsArr = obj.optJSONArray("tags")
+            val selected = obj.optString("selected", "")
+            proxyBinding.layoutNodes.removeAllViews()
+            if (tagsArr == null || tagsArr.length() == 0) {
+                proxyBinding.tvNodesEmpty.visibility = View.VISIBLE
+                return
+            }
+            proxyBinding.tvNodesEmpty.visibility = View.GONE
+            val fetched = obj.optLong("fetched_at", 0)
+            if (fetched > 0) {
+                val time = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(fetched * 1000))
+                proxyBinding.tvSubMeta.text = "上次更新: $time · ${tagsArr.length()} 个节点"
+            }
+            for (i in 0 until tagsArr.length()) {
+                val tag = tagsArr.optString(i)
+                if (tag.isBlank()) continue
+                val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    text = if (tag == selected) "✓ $tag" else tag
+                    isAllCaps = false
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = 8 }
+                    setOnClickListener { selectOutbound(tag) }
+                }
+                proxyBinding.layoutNodes.addView(btn)
+            }
+        } catch (_: Exception) {
+            proxyBinding.tvNodesEmpty.visibility = View.VISIBLE
+        }
+    }
+
+    private fun selectOutbound(tag: String) {
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val cfg = JSONObject().apply {
+                        put("sub_url", prefs.clientSubUrl)
+                        put("data_dir", filesDir.absolutePath)
+                    }.toString()
+                    val runner = Mobile.newClientRunner(cfg, object : io.ladderairport.agent.mobile.Host {
+                        override fun writeLog(line: String?) {
+                            if (!line.isNullOrBlank()) LadderApplication.appendLog(line)
+                        }
+                        override fun nodeMetricsJSON(): String = "{}"
+                        override fun interfacesJSON(): String = "[]"
+                    }, object : io.ladderairport.agent.mobile.TunHost {
+                        override fun openTun(optionsJSON: String?): Int {
+                            throw IllegalStateException("select-only")
+                        }
+                        override fun protect(fd: Int) {}
+                    })
+                    runner.selectOutbound(tag)
+                }
+                Toast.makeText(this@MainActivity, "已选择: $tag", Toast.LENGTH_SHORT).show()
+                refreshProxyOutboundsUi()
+                if (ClientVpnService.isServiceRunning.value == true) {
+                    // Restart VPN to apply selection
+                    ClientVpnService.stop(this@MainActivity)
+                    delayRestartClient()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "切换失败: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun delayRestartClient() {
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(800)
+            maybeStartClientVpn()
+        }
+    }
+
     private fun loadCurrentConfigDisplay() {
         lifecycleScope.launch(Dispatchers.IO) {
             val configFile = File(filesDir, "current.json")
             if (configFile.exists() && configFile.length() > 0) {
                 try {
                     val raw = configFile.readText()
-                    val pretty = JSONObject(raw).toString(2)
+                    val parsed: Any = when {
+                        raw.trimStart().startsWith("[") -> org.json.JSONArray(raw)
+                        else -> JSONObject(raw)
+                    }
+                    val pretty = when (parsed) {
+                        is JSONObject -> parsed.toString(2)
+                        is org.json.JSONArray -> parsed.toString(2)
+                        else -> raw
+                    }
                     val lastMod = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(configFile.lastModified()))
                     val sizeKb = String.format(Locale.US, "%.1f KB", configFile.length() / 1024.0)
                     withContext(Dispatchers.Main) {
-                        configBinding.tvConfigStatus.text = "已同步 ($lastMod, $sizeKb)"
-                        configBinding.tvCurrentConfigContent.text = pretty
+                        cachedConfigCopyText = pretty
+                        configBinding.tvConfigStatus.text = "已同步 ($lastMod, $sizeKb) · 点击行展开"
+                        JsonTreeView.render(configBinding.layoutConfigTree, parsed)
                     }
                 } catch (_: Exception) {
                     val raw = configFile.readText()
                     withContext(Dispatchers.Main) {
-                        configBinding.tvConfigStatus.text = "已同步 (原始格式)"
-                        configBinding.tvCurrentConfigContent.text = raw
+                        cachedConfigCopyText = raw
+                        configBinding.tvConfigStatus.text = "已同步 (无法解析为 JSON 树)"
+                        JsonTreeView.renderMessage(
+                            configBinding.layoutConfigTree,
+                            raw.ifBlank { "配置文件为空" }
+                        )
                     }
                 }
             } else {
                 withContext(Dispatchers.Main) {
+                    cachedConfigCopyText = ""
                     configBinding.tvConfigStatus.text = "暂无生效的下发配置"
-                    configBinding.tvCurrentConfigContent.text = "暂未从 Panel 获取到下发的节点配置 (current.json)\n请确认 Agent 服务已启动并成功连接至 Panel。"
+                    JsonTreeView.renderMessage(
+                        configBinding.layoutConfigTree,
+                        "暂未从 Panel 获取到下发的节点配置 (current.json)\n请确认 Agent 服务已启动并成功连接至 Panel。"
+                    )
                 }
             }
         }
@@ -396,6 +690,42 @@ class MainActivity : AppCompatActivity() {
             updateStatusDetails(status)
         }
 
+        ClientVpnService.isServiceRunning.observe(this) { running ->
+            suppressConnectSwitch = true
+            proxyBinding.switchConnect.isChecked = running == true
+            suppressConnectSwitch = false
+            proxyBinding.tvClientStatus.text = if (running == true) "已连接" else "已断开"
+            refreshStatusChrome()
+        }
+
+        ClientVpnService.lastError.observe(this) { err ->
+            if (!err.isNullOrBlank()) {
+                proxyBinding.tvSubError.visibility = View.VISIBLE
+                proxyBinding.tvSubError.text = err
+            }
+        }
+
+        ClientVpnService.outboundsJSON.observe(this) { json ->
+            if (!json.isNullOrBlank()) {
+                renderOutbounds(json)
+            }
+        }
+
+        ClientVpnService.statusJSON.observe(this) { json ->
+            try {
+                val obj = JSONObject(json ?: "{}")
+                if (obj.optBoolean("running", false)) {
+                    val selected = obj.optString("selected_tag", "")
+                    proxyBinding.tvClientStatus.text = if (selected.isNotBlank()) {
+                        "已连接 · $selected"
+                    } else {
+                        "已连接"
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
         LadderApplication.logLines.observe(this) { lines ->
             logsBinding.tvTerminalOutput.text = if (lines.isEmpty()) {
                 "等待日志输出..."
@@ -465,22 +795,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshStatusChrome() {
+        val clientRunning = ClientVpnService.isServiceRunning.value == true
         val running = AgentService.isServiceRunning.value == true
         val status = AgentService.currentStatus.value
         val kind = when {
-            status != null && status.lastError.isNotBlank() && !running -> StatusKind.ERROR
-            running -> StatusKind.RUNNING
+            status != null && status.lastError.isNotBlank() && !running && !clientRunning -> StatusKind.ERROR
+            running || clientRunning -> StatusKind.RUNNING
             else -> StatusKind.STOPPED
         }
-        val dashboardLabel = when (kind) {
-            StatusKind.RUNNING -> "运行中"
-            StatusKind.ERROR -> "运行异常"
-            StatusKind.STOPPED -> getString(R.string.status_stopped)
+        val dashboardLabel = when {
+            clientRunning && running -> "Agent+VPN"
+            clientRunning -> "客户端"
+            kind == StatusKind.RUNNING -> "运行中"
+            kind == StatusKind.ERROR -> "运行异常"
+            else -> getString(R.string.status_stopped)
         }
-        val topLabel = when (kind) {
-            StatusKind.RUNNING -> "在线"
-            StatusKind.ERROR -> "异常"
-            StatusKind.STOPPED -> getString(R.string.status_stopped)
+        val topLabel = when {
+            clientRunning && running -> "双开"
+            clientRunning -> "VPN"
+            kind == StatusKind.RUNNING -> "在线"
+            kind == StatusKind.ERROR -> "异常"
+            else -> getString(R.string.status_stopped)
         }
         applyStatus(dashboardBinding.pillStatus, dashboardBinding.dotStatus, dashboardBinding.tvStatusText, kind, dashboardLabel)
         applyStatus(binding.topStatusBadge, binding.topStatusDot, binding.topStatusText, kind, topLabel)

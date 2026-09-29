@@ -5,14 +5,16 @@ import androidx.recyclerview.widget.RecyclerView
 import io.ladderairport.agent.databinding.PageConfigBinding
 import io.ladderairport.agent.databinding.PageDashboardBinding
 import io.ladderairport.agent.databinding.PageLogsBinding
+import io.ladderairport.agent.databinding.PageProxyBinding
 
 class MainPagerAdapter(
     val dashboardBinding: PageDashboardBinding,
     val configBinding: PageConfigBinding,
+    val proxyBinding: PageProxyBinding,
     val logsBinding: PageLogsBinding
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    override fun getItemCount(): Int = 3
+    override fun getItemCount(): Int = 4
 
     override fun getItemViewType(position: Int): Int = position
 
@@ -20,7 +22,8 @@ class MainPagerAdapter(
         val view = when (viewType) {
             0 -> dashboardBinding.root
             1 -> configBinding.root
-            2 -> logsBinding.root
+            2 -> proxyBinding.root
+            3 -> logsBinding.root
             else -> throw IllegalArgumentException("Invalid position: $viewType")
         }
         (view.parent as? ViewGroup)?.removeView(view)

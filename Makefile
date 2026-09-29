@@ -6,9 +6,8 @@ export ANDROID_NDK_HOME := $(if $(ANDROID_NDK_HOME),$(ANDROID_NDK_HOME),$(shell 
 
 ANDROID_API ?= 24
 ANDROID_PKG ?= io.ladderairport.agent
-# 与服务器 Agent 同一套协议标签。不带 with_gvisor / with_clash_api / with_wireguard：
-# 这是 FRP 节点，不是本机 VPN，那些标签会把 libgojni 撑大。
-ANDROID_TAGS ?= with_quic,with_utls,with_android
+# 同 APK：Agent（FRP 节点）+ 本机 VPN 客户端。with_gvisor 供 TUN 使用。
+ANDROID_TAGS ?= with_quic,with_utls,with_android,with_gvisor
 ANDROID_TARGETS ?= android/arm64,android/amd64
 GOMOBILE ?= $(shell which gomobile 2>/dev/null || echo $(HOME)/go/bin/gomobile)
 

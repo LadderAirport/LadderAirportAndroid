@@ -345,26 +345,30 @@
 
                 </LinearLayout>
 
-                <HorizontalScrollView
+                <ScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="?attr/colorSurfaceContainerLowest"
+                    android:fillViewport="true"
+                    android:nestedScrollingEnabled="false"
                     android:padding="12dp">
 
-                    <TextView
-                        android:id="@+id/tvCurrentConfigContent"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:id="@+id/layoutConfigTree"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:fontFamily="monospace"
-                        android:lineSpacingMultiplier="1.15"
-                        android:text="暂无下发的节点配置"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textIsSelectable="true"
-                        android:textSize="12sp" />
+                        android:orientation="vertical" />
 
-                </HorizontalScrollView>
+                </ScrollView>
+
+                <!-- Kept for compatibility / empty-state accessibility; hidden in normal tree mode -->
+                <TextView
+                    android:id="@+id/tvCurrentConfigContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:text="" />
 
             </LinearLayout>
 

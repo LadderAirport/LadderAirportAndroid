@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">LadderAirport Agent</string>
-    <string name="notification_channel_name">Agent 运行服务</string>
-    <string name="notification_channel_desc">保持 LadderAirport 节点代理前台常驻运行</string>
+    <string name="notification_channel_name">LadderAirport 服务</string>
+    <string name="notification_channel_desc">保持 Agent 节点或客户端 VPN 前台常驻运行</string>
     <string name="status_stopped">已停止</string>
     <string name="status_running">正在运行</string>
     <string name="status_error">运行异常</string>

@@ -45,6 +45,23 @@
                 android:value="LadderAirport edge proxy node runtime and WebSocket control uplink" />
         </service>
 
+        <service
+            android:name=".service.ClientVpnService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="LadderAirport local sing-box VPN client using Ladder subscription" />
+            <meta-data
+                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+                android:value="true" />
+        </service>
+
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
