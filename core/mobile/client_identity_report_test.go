@@ -1,5 +1,3 @@
-//go:build client_version_report
-
 package mobile
 
 import (

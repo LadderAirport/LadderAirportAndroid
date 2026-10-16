@@ -1,13 +1,12 @@
-//go:build !client_version_report
-
 package mobile
 
-// publishClientIdentity assigns the wrapper identity that version.Report
-// sends to the Panel.
-//
-// The pinned LadderAirport commit on merged main does not export
-// version.ClientType or version.ClientVersion yet (added in LadderAirport#4,
-// not merged). Referencing those names here would fail the AAR build.
-// make aar adds the client_version_report tag once version.go declares
-// `var ClientType`, and client_identity_report.go performs the assignment.
-func publishClientIdentity(string) {}
+import "github.com/ladderairport/agent/internal/version"
+
+// publishClientIdentity writes the Android wrapper identity into the version
+// package. control.Server.Ping calls version.Report, which copies these vars
+// onto the heartbeat. Version and Commit stay the core ldflags.
+// LuciVersion is not an Android field.
+func publishClientIdentity(clientVersion string) {
+	version.ClientType = ClientTypeAndroid
+	version.ClientVersion = clientVersion
+}

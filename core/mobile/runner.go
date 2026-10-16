@@ -132,11 +132,10 @@ func NewRunner(cfgJSON string, host Host) (*Runner, error) {
 // The legacy "version" key used to overwrite the core version; it is now
 // only a fallback for client_version.
 //
-// client_type is fixed to android. Uplink identity is read from the version
-// package (version.Report uses ClientType and ClientVersion), not from this
-// struct. publishClientIdentity assigns those vars when the submodule
-// exports them (LadderAirport#4). Until that pin moves, the stub compiles
-// against merged main and agent_version stays the core version.
+// client_type is fixed to android. Heartbeats read version.ClientType and
+// version.ClientVersion via version.Report, not this struct.
+// publishClientIdentity assigns those package vars. Version and Commit stay
+// the core ldflags.
 func applyClientIdentity(cfg *Config) (coreVersion, coreCommit, clientVersion, clientType string) {
 	clientVersion = strings.TrimSpace(cfg.ClientVersion)
 	if clientVersion == "" {
