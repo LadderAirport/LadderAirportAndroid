@@ -18,7 +18,15 @@ ifeq ($(wildcard $(LADDER_ROOT)/agent/go.mod),)
   LADDER_ROOT := $(abspath $(CURDIR)/../LadderAirport)
 endif
 
-VERSION ?= $(shell git -C $(LADDER_ROOT) describe --tags --abbrev=0 2>/dev/null || echo v0.15.9)
+# Core version baked into the AAR as version.Version (agent_version and, once
+# the main repo reports it, core_version). Exact tag: vX.Y.Z. Otherwise
+# vX.Y.Z-N-gSHA from `git describe --tags --always`.
+# Do not pass --abbrev=0: that drops the commit distance and looks like a
+# release this binary is not. Do not fall back to a hardcoded tag (the old
+# v0.15.9 default shipped a fake release whenever describe failed).
+# version.Commit is the core commit (core_commit). The pinned submodule has
+# no separate CoreCommit symbol yet; do not -X a name that does not exist.
+VERSION ?= $(shell git -C $(LADDER_ROOT) describe --tags --always 2>/dev/null)
 GIT_COMMIT ?= $(shell git -C $(LADDER_ROOT) rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 SINGBOX_VERSION ?= $(shell tag=$$(git -C $(LADDER_ROOT)/agent/sing-box describe --tags 2>/dev/null) && echo "$${tag}" | sed 's/^v//' || echo 1.12.22)
@@ -71,7 +79,13 @@ check-src:
 	@git -C "$(LADDER_ROOT)" rev-parse --short HEAD 2>/dev/null || true
 
 aar: check-src
-	@echo "==> Building ladderagent.aar from core/mobile (version: $(VERSION))..."
+	@if [ -z "$(VERSION)" ]; then \
+		echo "error: core version is empty."; \
+		echo "  git -C $(LADDER_ROOT) describe --tags --always"; \
+		echo "Refusing to fall back to a hardcoded tag."; \
+		exit 1; \
+	fi
+	@echo "==> Building ladderagent.aar from core/mobile (core: $(VERSION) commit: $(GIT_COMMIT))..."
 	mkdir -p app/libs
 	cd core && GOWORK=off $(GOMOBILE) bind -target=$(ANDROID_TARGETS) -androidapi $(ANDROID_API) \
 		-javapkg=$(ANDROID_PKG) -tags "$(ANDROID_TAGS)" \

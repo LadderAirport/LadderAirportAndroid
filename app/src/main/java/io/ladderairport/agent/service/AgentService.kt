@@ -13,13 +13,14 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.MutableLiveData
-import com.google.gson.Gson
+import io.ladderairport.agent.BuildConfig
 import io.ladderairport.agent.LadderApplication
 import io.ladderairport.agent.R
 import io.ladderairport.agent.mobile.Host
 import io.ladderairport.agent.mobile.Mobile
 import io.ladderairport.agent.mobile.Runner
 import io.ladderairport.agent.model.AgentStatus
+import io.ladderairport.agent.model.parseAgentStatus
 import io.ladderairport.agent.ui.MainActivity
 import io.ladderairport.agent.util.DeviceMetricsHelper
 import io.ladderairport.agent.util.NetworkInterfaceHelper
@@ -63,7 +64,6 @@ class AgentService : Service(), Host {
     private val isStarting = java.util.concurrent.atomic.AtomicBoolean(false)
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var statusMonitorJob: Job? = null
-    private val gson = Gson()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -117,15 +117,17 @@ class AgentService : Service(), Host {
                 val prefs = LadderApplication.instance.prefs
                 val dataDir = filesDir.absolutePath
 
-                val cfgJson = JSONObject().apply {
-                    put("panel_url", prefs.panelUrl)
-                    put("node_id", prefs.nodeId)
-                    put("token", prefs.token)
-                    put("data_dir", dataDir)
-                    put("report_secs", prefs.reportSecs)
-                    put("config_secs", prefs.configSecs)
-                    put("uplink_ws", true)
-                }.toString()
+                val cfgJson = JSONObject(
+                    buildRunnerConfig(
+                        panelUrl = prefs.panelUrl,
+                        nodeId = prefs.nodeId,
+                        token = prefs.token,
+                        dataDir = dataDir,
+                        reportSecs = prefs.reportSecs,
+                        configSecs = prefs.configSecs,
+                        clientVersion = BuildConfig.VERSION_NAME,
+                    )
+                ).toString()
 
                 LadderApplication.appendLog("创建 Agent Runner: panel=${prefs.panelUrl} node=${prefs.nodeId}")
                 val newRunner = Mobile.newRunner(cfgJson, this@AgentService)
@@ -204,28 +206,7 @@ class AgentService : Service(), Host {
         }
     }
 
-    private fun parseStatus(json: String): AgentStatus {
-        return try {
-            val obj = JSONObject(json)
-            AgentStatus(
-                running = obj.optBoolean("running", false),
-                state = obj.optString("state", "unknown"),
-                agentVersion = obj.optString("agent_version", ""),
-                singboxVersion = obj.optString("singbox_version", ""),
-                panelUrl = obj.optString("panel_url", ""),
-                nodeId = obj.optString("node_id", ""),
-                startedAtUnix = obj.optLong("started_at_unix", 0),
-                uptimeSecs = obj.optLong("uptime_secs", 0),
-                uplinkBytes = obj.optLong("uplink_bytes", 0),
-                downlinkBytes = obj.optLong("downlink_bytes", 0),
-                connections = obj.optLong("connections", 0),
-                configHash = obj.optString("config_hash", ""),
-                lastError = obj.optString("last_error", "")
-            )
-        } catch (_: Exception) {
-            AgentStatus()
-        }
-    }
+    private fun parseStatus(json: String): AgentStatus = parseAgentStatus(json)
 
     private fun buildNotification(contentText: String): Notification {
         val prefs = LadderApplication.instance.prefs

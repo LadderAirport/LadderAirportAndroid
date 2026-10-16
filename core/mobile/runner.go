@@ -42,21 +42,33 @@ type Config struct {
 	UplinkWS   bool   `json:"uplink_ws"`
 	ReportSecs int    `json:"report_secs"`
 	ConfigSecs int    `json:"config_secs"`
-	Version    string `json:"version,omitempty"`
+	// Version is a legacy JSON key. It used to replace the core agent version.
+	// It is now only a fallback for client_version (the APK versionName).
+	Version       string `json:"version,omitempty"`
+	ClientVersion string `json:"client_version,omitempty"`
+	ClientType    string `json:"client_type,omitempty"`
 }
+
+// ClientTypeAndroid is the closed client_type for this mobile runner.
+// Do not infer the platform from a version string.
+const ClientTypeAndroid = "android"
 
 // Runner drives the agent lifecycle on Android (uplink-ws + in-process sing-box).
 type Runner struct {
-	mu        sync.Mutex
-	cfg       Config
-	host      Host
-	running   bool
-	cancel    context.CancelFunc
-	rt        *control.BoxRuntime
-	srv       *control.Server
-	startedAt int64
-	lastError string
-	logWriter *hostLogWriter
+	mu            sync.Mutex
+	cfg           Config
+	host          Host
+	running       bool
+	cancel        context.CancelFunc
+	rt            *control.BoxRuntime
+	srv           *control.Server
+	startedAt     int64
+	lastError     string
+	logWriter     *hostLogWriter
+	coreVersion   string
+	coreCommit    string
+	clientType    string
+	clientVersion string
 }
 
 type hostLogWriter struct {
@@ -100,15 +112,40 @@ func NewRunner(cfgJSON string, host Host) (*Runner, error) {
 	if cfg.ConfigSecs <= 0 {
 		cfg.ConfigSecs = 60
 	}
-	if strings.TrimSpace(cfg.Version) == "" {
-		cfg.Version = version.Version
-	}
+	coreVersion, coreCommit, clientVersion, clientType := applyClientIdentity(&cfg)
 
 	return &Runner{
-		cfg:       cfg,
-		host:      host,
-		logWriter: &hostLogWriter{host: host},
+		cfg:           cfg,
+		host:          host,
+		logWriter:     &hostLogWriter{host: host},
+		coreVersion:   coreVersion,
+		coreCommit:    coreCommit,
+		clientType:    clientType,
+		clientVersion: clientVersion,
 	}, nil
+}
+
+// applyClientIdentity separates the shell version from the core version.
+//
+// agent_version and core_version stay version.Version (ldflag from
+// `git describe --tags --always`). client_version is the APK versionName.
+// The legacy "version" key used to overwrite the core version; it is now
+// only a fallback for client_version.
+//
+// client_type is fixed to android. Heartbeats read version.ClientType and
+// version.ClientVersion via version.Report, not this struct.
+// publishClientIdentity assigns those package vars. Version and Commit stay
+// the core ldflags.
+func applyClientIdentity(cfg *Config) (coreVersion, coreCommit, clientVersion, clientType string) {
+	clientVersion = strings.TrimSpace(cfg.ClientVersion)
+	if clientVersion == "" {
+		clientVersion = strings.TrimSpace(cfg.Version)
+	}
+	cfg.ClientVersion = clientVersion
+	cfg.ClientType = ClientTypeAndroid
+	cfg.Version = version.Version
+	publishClientIdentity(clientVersion)
+	return version.Version, version.Commit, clientVersion, ClientTypeAndroid
 }
 
 // New is an alias for NewRunner for compatibility with android-agent.md.
@@ -140,7 +177,9 @@ func (r *Runner) Start() error {
 	log.SetOutput(io.MultiWriter(os.Stderr, logs.Writer("info"), r.logWriter))
 
 	singboxVer := control.SingboxVersion()
-	agentVer := r.cfg.Version
+	// Core version only. version.Report reads ClientType and ClientVersion
+	// from the package vars set in applyClientIdentity, not from this argument.
+	agentVer := r.coreVersion
 	srv := control.NewServer(rt, agentVer, singboxVer, logs)
 	srv.SetDataDir(r.cfg.DataDir)
 	resolver := control.NewPublicAddressResolver()
@@ -255,7 +294,8 @@ func (r *Runner) Start() error {
 		}
 	}
 
-	log.Printf("Android Agent 已启动：NodeID=%s PanelURL=%s", r.cfg.NodeID, r.cfg.PanelURL)
+	log.Printf("Android Agent 已启动：NodeID=%s PanelURL=%s core=%s commit=%s client_type=%s client_version=%s",
+		r.cfg.NodeID, r.cfg.PanelURL, r.coreVersion, r.coreCommit, r.clientType, r.clientVersion)
 	return nil
 }
 
@@ -292,6 +332,10 @@ type StatusInfo struct {
 	Running        bool   `json:"running"`
 	State          string `json:"state"`
 	AgentVersion   string `json:"agent_version"`
+	CoreVersion    string `json:"core_version"`
+	CoreCommit     string `json:"core_commit"`
+	ClientType     string `json:"client_type"`
+	ClientVersion  string `json:"client_version"`
 	SingboxVersion string `json:"singbox_version"`
 	PanelURL       string `json:"panel_url"`
 	NodeID         string `json:"node_id"`
@@ -312,7 +356,11 @@ func (r *Runner) StatusJSON() string {
 	info := StatusInfo{
 		Running:        r.running,
 		State:          "stopped",
-		AgentVersion:   r.cfg.Version,
+		AgentVersion:   r.coreVersion,
+		CoreVersion:    r.coreVersion,
+		CoreCommit:     r.coreCommit,
+		ClientType:     r.clientType,
+		ClientVersion:  r.clientVersion,
 		SingboxVersion: control.SingboxVersion(),
 		PanelURL:       r.cfg.PanelURL,
 		NodeID:         r.cfg.NodeID,

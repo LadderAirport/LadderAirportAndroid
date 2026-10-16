@@ -54,7 +54,10 @@ jobs:
             VERSION="${GITHUB_REF_NAME}"
             IS_RELEASE=true
           else
-            VERSION="$(git -C LadderAirport describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)-$(git rev-parse --short HEAD)"
+            # APK versionName / artifact name only (client_version). This is the
+            # Android repo, not the core submodule. The AAR step passes
+            # `git -C LadderAirport describe --tags --always` separately.
+            VERSION="$(git describe --tags --always 2>/dev/null || echo v0.0.0-dev)"
             IS_RELEASE=false
           fi
           # versionCode: strip leading v / non-digits, fall back to run number
@@ -102,7 +105,16 @@ jobs:
 
       - name: Build AAR (arm64 + amd64)
         working-directory: android
-        run: make aar ANDROID_TARGETS=android/arm64,android/amd64
+        run: |
+          set -euo pipefail
+          # Core identity only. Exact tag vX.Y.Z, otherwise vX.Y.Z-N-gSHA.
+          # No --abbrev=0, and no hardcoded tag if describe fails.
+          CORE_VERSION="$(git -C LadderAirport describe --tags --always)"
+          CORE_COMMIT="$(git -C LadderAirport rev-parse --short HEAD)"
+          echo "Core version ${CORE_VERSION} commit ${CORE_COMMIT}"
+          make aar ANDROID_TARGETS=android/arm64,android/amd64 \
+            VERSION="${CORE_VERSION}" \
+            GIT_COMMIT="${CORE_COMMIT}"
 
       - name: Unit tests
         working-directory: android
