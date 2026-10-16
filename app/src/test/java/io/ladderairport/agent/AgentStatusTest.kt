@@ -1,9 +1,11 @@
 package io.ladderairport.agent
 
-import com.google.gson.JsonParser
 import io.ladderairport.agent.model.AgentStatus
+import io.ladderairport.agent.model.parseAgentStatus
+import io.ladderairport.agent.service.buildRunnerConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,22 +40,7 @@ class AgentStatusTest {
             }
         """.trimIndent()
 
-        val obj = JsonParser.parseString(json).asJsonObject
-        val status = AgentStatus(
-            running = obj.get("running").asBoolean,
-            state = obj.get("state").asString,
-            agentVersion = obj.get("agent_version").asString,
-            singboxVersion = obj.get("singbox_version").asString,
-            panelUrl = obj.get("panel_url").asString,
-            nodeId = obj.get("node_id").asString,
-            startedAtUnix = obj.get("started_at_unix").asLong,
-            uptimeSecs = obj.get("uptime_secs").asLong,
-            uplinkBytes = obj.get("uplink_bytes").asLong,
-            downlinkBytes = obj.get("downlink_bytes").asLong,
-            connections = obj.get("connections").asLong,
-            configHash = obj.get("config_hash").asString,
-            lastError = obj.get("last_error").asString
-        )
+        val status = parseAgentStatus(json)
 
         assertTrue(status.running)
         assertEquals("running", status.state)
@@ -62,5 +49,49 @@ class AgentStatusTest {
         assertEquals(2097152L, status.downlinkBytes)
         assertEquals(5L, status.connections)
         assertEquals("abc123hash", status.configHash)
+        assertEquals("", status.clientVersion)
+        assertEquals("", status.coreVersion)
+    }
+
+    @Test
+    fun testDecoupledVersionFields() {
+        val json = """
+            {
+                "running": true,
+                "state": "running",
+                "agent_version": "v0.15.9-3-g2ebfece",
+                "core_version": "v0.15.9-3-g2ebfece",
+                "core_commit": "2ebfece",
+                "client_type": "android",
+                "client_version": "1.1.0"
+            }
+        """.trimIndent()
+
+        val status = parseAgentStatus(json)
+        assertEquals("v0.15.9-3-g2ebfece", status.agentVersion)
+        assertEquals(status.agentVersion, status.coreVersion)
+        assertEquals("2ebfece", status.coreCommit)
+        assertEquals("android", status.clientType)
+        assertEquals("1.1.0", status.clientVersion)
+        assertNotEquals(status.agentVersion, status.clientVersion)
+    }
+
+    @Test
+    fun testRunnerConfigKeepsClientVersionOffCoreKeys() {
+        val cfg = buildRunnerConfig(
+            panelUrl = "https://panel.example",
+            nodeId = "android-node-01",
+            token = "tok",
+            dataDir = "/data/data",
+            reportSecs = 15,
+            configSecs = 60,
+            clientVersion = "1.1.0",
+        )
+        assertEquals("1.1.0", cfg["client_version"])
+        assertEquals("android", cfg["client_type"])
+        assertEquals(true, cfg["uplink_ws"])
+        assertFalse(cfg.containsKey("version"))
+        assertFalse(cfg.containsKey("agent_version"))
+        assertFalse(cfg.containsKey("core_version"))
     }
 }

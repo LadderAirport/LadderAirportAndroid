@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+
+	"github.com/ladderairport/agent/internal/version"
 )
 
 type mockHost struct {
@@ -63,6 +65,118 @@ func TestNewRunner(t *testing.T) {
 	if st.NodeID != "test-node" {
 		t.Errorf("expected node_id=test-node, got %s", st.NodeID)
 	}
+}
+
+func TestClientVersionDoesNotOverrideCoreVersion(t *testing.T) {
+	withCoreIdentity(t, "v0.15.9-3-g2ebfece", "2ebfece")
+	status := mustStatus(t, map[string]any{
+		"panel_url":      "http://127.0.0.1:8080",
+		"node_id":        "test-node",
+		"token":          "test-token",
+		"data_dir":       t.TempDir(),
+		"client_version": "1.1.0",
+		"client_type":    "android",
+		// Legacy key used to replace agent_version. A different shell string
+		// must not win over client_version or become the core version.
+		"version": "9.9.9",
+	})
+	if status.AgentVersion != "v0.15.9-3-g2ebfece" || status.CoreVersion != status.AgentVersion {
+		t.Fatalf("core/agent version = %q / %q, want v0.15.9-3-g2ebfece", status.AgentVersion, status.CoreVersion)
+	}
+	if status.CoreCommit != "2ebfece" {
+		t.Fatalf("core_commit = %q", status.CoreCommit)
+	}
+	if status.ClientVersion != "1.1.0" {
+		t.Fatalf("client_version = %q, want 1.1.0", status.ClientVersion)
+	}
+	if status.ClientType != ClientTypeAndroid {
+		t.Fatalf("client_type = %q, want android", status.ClientType)
+	}
+	if status.ClientVersion == status.AgentVersion {
+		t.Fatal("client_version must stay distinct from the core version")
+	}
+}
+
+func TestLegacyVersionKeyIsClientVersionOnly(t *testing.T) {
+	withCoreIdentity(t, "v0.15.12", "abc1234")
+	status := mustStatus(t, map[string]any{
+		"panel_url": "http://127.0.0.1:8080",
+		"node_id":   "test-node",
+		"token":     "test-token",
+		"data_dir":  t.TempDir(),
+		"version":   "1.0.0",
+	})
+	if status.AgentVersion != "v0.15.12" || status.CoreVersion != "v0.15.12" {
+		t.Fatalf("legacy version key overwrote core: agent=%q core=%q", status.AgentVersion, status.CoreVersion)
+	}
+	if status.ClientVersion != "1.0.0" {
+		t.Fatalf("client_version = %q, want legacy version 1.0.0", status.ClientVersion)
+	}
+	if status.ClientType != ClientTypeAndroid {
+		t.Fatalf("client_type = %q", status.ClientType)
+	}
+}
+
+func TestClientTypeIsAlwaysAndroid(t *testing.T) {
+	withCoreIdentity(t, "v0.15.12", "abc1234")
+	status := mustStatus(t, map[string]any{
+		"panel_url":      "http://127.0.0.1:8080",
+		"node_id":        "test-node",
+		"token":          "test-token",
+		"data_dir":       t.TempDir(),
+		"client_version": "1.1.0",
+		"client_type":    "linux",
+	})
+	if status.ClientType != ClientTypeAndroid {
+		t.Fatalf("client_type = %q, want android", status.ClientType)
+	}
+	if status.ClientVersion != "1.1.0" || status.AgentVersion != "v0.15.12" {
+		t.Fatalf("identity drifted: client=%q agent=%q", status.ClientVersion, status.AgentVersion)
+	}
+}
+
+func TestOmittedClientVersionStaysEmpty(t *testing.T) {
+	withCoreIdentity(t, "v0.15.12", "abc1234")
+	status := mustStatus(t, map[string]any{
+		"panel_url": "http://127.0.0.1:8080",
+		"node_id":   "test-node",
+		"token":     "test-token",
+		"data_dir":  t.TempDir(),
+	})
+	if status.ClientVersion != "" {
+		t.Fatalf("client_version = %q, want empty rather than the core version", status.ClientVersion)
+	}
+	if status.AgentVersion != "v0.15.12" || status.ClientType != ClientTypeAndroid {
+		t.Fatalf("agent=%q client_type=%q", status.AgentVersion, status.ClientType)
+	}
+}
+
+func withCoreIdentity(t *testing.T, ver, commit string) {
+	t.Helper()
+	prevVer, prevCommit := version.Version, version.Commit
+	version.Version = ver
+	version.Commit = commit
+	t.Cleanup(func() {
+		version.Version = prevVer
+		version.Commit = prevCommit
+	})
+}
+
+func mustStatus(t *testing.T, cfg map[string]any) StatusInfo {
+	t.Helper()
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	r, err := NewRunner(string(raw), &mockHost{})
+	if err != nil {
+		t.Fatalf("NewRunner: %v", err)
+	}
+	var status StatusInfo
+	if err := json.Unmarshal([]byte(r.StatusJSON()), &status); err != nil {
+		t.Fatalf("unmarshal status: %v", err)
+	}
+	return status
 }
 
 func TestRunnerHostLogging(t *testing.T) {
