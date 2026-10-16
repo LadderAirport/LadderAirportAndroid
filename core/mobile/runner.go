@@ -132,11 +132,11 @@ func NewRunner(cfgJSON string, host Host) (*Runner, error) {
 // The legacy "version" key used to overwrite the core version; it is now
 // only a fallback for client_version.
 //
-// client_type is fixed to android. The pinned LadderAirport submodule does
-// not yet carry core_version, core_commit, client_type, or client_version on
-// PingResponse or the uplink report body, so those values are kept here and
-// on StatusJSON. control.Server is still constructed with the core version
-// only, which is what old panels read as agent_version.
+// client_type is fixed to android. Uplink identity is read from the version
+// package (version.Report uses ClientType and ClientVersion), not from this
+// struct. publishClientIdentity assigns those vars when the submodule
+// exports them (LadderAirport#4). Until that pin moves, the stub compiles
+// against merged main and agent_version stays the core version.
 func applyClientIdentity(cfg *Config) (coreVersion, coreCommit, clientVersion, clientType string) {
 	clientVersion = strings.TrimSpace(cfg.ClientVersion)
 	if clientVersion == "" {
@@ -145,6 +145,7 @@ func applyClientIdentity(cfg *Config) (coreVersion, coreCommit, clientVersion, c
 	cfg.ClientVersion = clientVersion
 	cfg.ClientType = ClientTypeAndroid
 	cfg.Version = version.Version
+	publishClientIdentity(clientVersion)
 	return version.Version, version.Commit, clientVersion, ClientTypeAndroid
 }
 
@@ -177,9 +178,8 @@ func (r *Runner) Start() error {
 	log.SetOutput(io.MultiWriter(os.Stderr, logs.Writer("info"), r.logWriter))
 
 	singboxVer := control.SingboxVersion()
-	// Core version only. client_version must not be passed as agent_version.
-	// Wiring client_type / client_version / core_commit into Ping is blocked
-	// on the main-repo report fields; see applyClientIdentity.
+	// Core version only. version.Report reads ClientType and ClientVersion
+	// from the package vars set in applyClientIdentity, not from this argument.
 	agentVer := r.coreVersion
 	srv := control.NewServer(rt, agentVer, singboxVer, logs)
 	srv.SetDataDir(r.cfg.DataDir)

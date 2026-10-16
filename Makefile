@@ -37,6 +37,16 @@ VERSION_LDFLAGS = \
 	-X 'github.com/ladderairport/agent/internal/version.BuiltAt=$(BUILD_TIME)' \
 	-X 'github.com/sagernet/sing-box/constant.Version=$(SINGBOX_VERSION)'
 
+# LadderAirport#4 reports client identity from version.ClientType and
+# version.ClientVersion (version.Report), not from the Runner struct.
+# Merged main does not have those vars yet. Once the submodule pin does,
+# compile the assignment. Appended separately so an env ANDROID_TAGS
+# (CI omits with_gvisor) still picks it up.
+CLIENT_IDENTITY_TAG :=
+ifeq ($(shell grep -q '^var ClientType ' "$(LADDER_ROOT)/agent/internal/version/version.go" 2>/dev/null && echo yes),yes)
+  CLIENT_IDENTITY_TAG := ,client_version_report
+endif
+
 all: aar assemble
 
 help:
@@ -88,7 +98,7 @@ aar: check-src
 	@echo "==> Building ladderagent.aar from core/mobile (core: $(VERSION) commit: $(GIT_COMMIT))..."
 	mkdir -p app/libs
 	cd core && GOWORK=off $(GOMOBILE) bind -target=$(ANDROID_TARGETS) -androidapi $(ANDROID_API) \
-		-javapkg=$(ANDROID_PKG) -tags "$(ANDROID_TAGS)" \
+		-javapkg=$(ANDROID_PKG) -tags "$(ANDROID_TAGS)$(CLIENT_IDENTITY_TAG)" \
 		-ldflags="-checklinkname=0 -s -w $(VERSION_LDFLAGS)" \
 		-o ../app/libs/ladderagent.aar ./mobile
 	@echo "==> ladderagent.aar updated."
