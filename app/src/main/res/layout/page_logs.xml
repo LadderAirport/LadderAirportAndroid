@@ -48,10 +48,23 @@
             android:layout_weight="1" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAutoScroll"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="10dp"
+            android:text="自动滚动"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="@color/terminal_accent" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCopyLogs"
             style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/cd_copy_logs"
             app:icon="@drawable/ic_copy"
             app:iconTint="@color/terminal_text" />
@@ -59,12 +72,55 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnClearLogs"
             style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/cd_clear_logs"
             app:icon="@drawable/ic_delete"
             app:iconTint="@color/terminal_text" />
 
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/terminal_divider" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/terminal_header"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/page_margin"
+        android:paddingVertical="6dp">
+
+        <EditText
+            android:id="@+id/etLogFilter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@null"
+            android:fontFamily="monospace"
+            android:hint="过滤日志 (如 error / vpn / ws)..."
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:minHeight="32dp"
+            android:singleLine="true"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="@color/terminal_text"
+            android:textColorHint="@color/terminal_muted" />
+
+        <TextView
+            android:id="@+id/btnClearLogFilter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:text="清除"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="@color/terminal_accent"
+            android:visibility="gone" />
     </LinearLayout>
 
     <View

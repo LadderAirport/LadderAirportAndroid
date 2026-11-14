@@ -55,9 +55,12 @@ import java.util.Date
 import java.util.Locale
 import android.app.Activity
 import android.net.VpnService
+import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.core.widget.NestedScrollView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 
 class MainActivity : AppCompatActivity() {
 
@@ -71,6 +74,9 @@ class MainActivity : AppCompatActivity() {
     private var lastConfigHash: String = ""
     private var suppressConnectSwitch = false
     private var cachedConfigCopyText: String = ""
+    private var isConfigPreviewExpanded = false
+    private var autoScrollLogs = true
+    private var logFilterQuery = ""
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -141,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         loadCurrentConfigDisplay()
         refreshProxyOutboundsUi()
+        updateBatteryOptimizationUi()
         if (prefs.autoStart && prefs.isConfigured() && prefs.enrolled) {
             if (AgentService.isServiceRunning.value != true) {
                 AgentService.start(this)
@@ -169,6 +176,12 @@ class MainActivity : AppCompatActivity() {
         val adapter = MainPagerAdapter(dashboardBinding, configBinding, proxyBinding, logsBinding)
         binding.viewPager.adapter = adapter
         binding.viewPager.offscreenPageLimit = 3
+
+        binding.topStatusBadge.setOnClickListener {
+            val clientOnly = ClientVpnService.isServiceRunning.value == true &&
+                AgentService.isServiceRunning.value != true
+            binding.viewPager.currentItem = if (clientOnly) 2 else 0
+        }
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
@@ -241,6 +254,18 @@ class MainActivity : AppCompatActivity() {
         dashboardBinding.tvBatteryStatus.setOnClickListener {
             requestBatteryOptimizationExemption()
         }
+
+        dashboardBinding.layoutDashboardVpn.setOnClickListener {
+            binding.viewPager.currentItem = 2
+        }
+
+        dashboardBinding.tvHeroPanelUrl.setOnClickListener {
+            if (!prefs.isConfigured()) {
+                binding.viewPager.currentItem = 1
+            }
+        }
+
+        updateBatteryOptimizationUi()
     }
 
     private fun initConfig() {
@@ -294,8 +319,15 @@ class MainActivity : AppCompatActivity() {
             requestBatteryOptimizationExemption()
         }
 
+        configBinding.layoutConfigHeader.setOnClickListener {
+            toggleConfigPreview()
+        }
+
         configBinding.btnRefreshConfig.setOnClickListener {
             loadCurrentConfigDisplay()
+            if (!isConfigPreviewExpanded) {
+                toggleConfigPreview()
+            }
             Toast.makeText(this, "已刷新下发配置", Toast.LENGTH_SHORT).show()
         }
 
@@ -334,6 +366,10 @@ class MainActivity : AppCompatActivity() {
 
         proxyBinding.btnRefreshSub.setOnClickListener {
             refreshSubscription()
+        }
+
+        proxyBinding.cardClientVpn.setOnClickListener {
+            proxyBinding.switchConnect.toggle()
         }
 
         proxyBinding.switchConnect.setOnCheckedChangeListener { _, checked ->
@@ -488,30 +524,78 @@ class MainActivity : AppCompatActivity() {
             proxyBinding.layoutNodes.removeAllViews()
             if (tagsArr == null || tagsArr.length() == 0) {
                 proxyBinding.tvNodesEmpty.visibility = View.VISIBLE
+                proxyBinding.tvNodesCount.text = ""
                 return
             }
             proxyBinding.tvNodesEmpty.visibility = View.GONE
+            proxyBinding.tvNodesCount.text = "${tagsArr.length()} 个节点"
             val fetched = obj.optLong("fetched_at", 0)
             if (fetched > 0) {
                 val time = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(fetched * 1000))
                 proxyBinding.tvSubMeta.text = "上次更新: $time · ${tagsArr.length()} 个节点"
             }
+            val colorPrimary = themeColor(androidx.appcompat.R.attr.colorPrimary)
+            val colorOutline = themeColor(com.google.android.material.R.attr.colorOutlineVariant)
+            val colorSelectedBg = themeColor(com.google.android.material.R.attr.colorSecondaryContainer)
+            val colorSelectedFg = themeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
+            val colorNormalBg = themeColor(com.google.android.material.R.attr.colorSurfaceContainerLowest)
+            val colorNormalFg = themeColor(com.google.android.material.R.attr.colorOnSurface)
+            val colorMutedFg = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+            val cornerRadius = resources.getDimension(R.dimen.card_corner_tile)
+            val strokePx = dpToPx(1)
+            val padH = dpToPx(14)
+            val padV = dpToPx(12)
+            val bottomGap = dpToPx(8)
+
             for (i in 0 until tagsArr.length()) {
                 val tag = tagsArr.optString(i)
                 if (tag.isBlank()) continue
-                val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                    text = if (tag == selected) "✓ $tag" else tag
-                    isAllCaps = false
+                val isSelected = tag == selected
+
+                val card = MaterialCardView(this).apply {
+                    radius = cornerRadius
+                    cardElevation = 0f
+                    strokeWidth = if (isSelected) strokePx * 2 else strokePx
+                    strokeColor = if (isSelected) colorPrimary else colorOutline
+                    setCardBackgroundColor(if (isSelected) colorSelectedBg else colorNormalBg)
+                    isClickable = true
+                    isFocusable = true
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply { bottomMargin = 8 }
+                    ).apply { bottomMargin = bottomGap }
                     setOnClickListener { selectOutbound(tag) }
                 }
-                proxyBinding.layoutNodes.addView(btn)
+
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(padH, padV, padH, padV)
+                }
+
+                val tvName = TextView(this).apply {
+                    text = tag
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
+                    setTextColor(if (isSelected) colorSelectedFg else colorNormalFg)
+                    if (isSelected) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val tvBadge = TextView(this).apply {
+                    text = if (isSelected) "✓ 当前" else "切换"
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
+                    setTextColor(if (isSelected) colorPrimary else colorMutedFg)
+                    setPadding(dpToPx(8), 0, 0, 0)
+                }
+
+                row.addView(tvName)
+                row.addView(tvBadge)
+                card.addView(row)
+                proxyBinding.layoutNodes.addView(card)
             }
         } catch (_: Exception) {
             proxyBinding.tvNodesEmpty.visibility = View.VISIBLE
+            proxyBinding.tvNodesCount.text = ""
         }
     }
 
@@ -604,19 +688,95 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initLogs() {
+        updateAutoScrollButton()
+
+        logsBinding.btnAutoScroll.setOnClickListener {
+            autoScrollLogs = !autoScrollLogs
+            updateAutoScrollButton()
+            if (autoScrollLogs) {
+                logsBinding.scrollLogs.post {
+                    logsBinding.scrollLogs.fullScroll(View.FOCUS_DOWN)
+                }
+            }
+        }
+
+        logsBinding.scrollLogs.setOnScrollChangeListener(
+            NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
+                val child = v.getChildAt(0) ?: return@OnScrollChangeListener
+                val atBottom = scrollY + v.height >= child.height - dpToPx(24)
+                if (scrollY < oldScrollY && !atBottom && autoScrollLogs) {
+                    autoScrollLogs = false
+                    updateAutoScrollButton()
+                } else if (atBottom && !autoScrollLogs) {
+                    autoScrollLogs = true
+                    updateAutoScrollButton()
+                }
+            }
+        )
+
+        logsBinding.etLogFilter.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                logFilterQuery = s?.toString()?.trim().orEmpty()
+                logsBinding.btnClearLogFilter.visibility =
+                    if (logFilterQuery.isEmpty()) View.GONE else View.VISIBLE
+                renderLogs(LadderApplication.logLines.value ?: emptyList())
+            }
+        })
+
+        logsBinding.btnClearLogFilter.setOnClickListener {
+            logsBinding.etLogFilter.setText("")
+        }
+
         logsBinding.btnClearLogs.setOnClickListener {
             LadderApplication.clearLogs()
         }
 
         logsBinding.btnCopyLogs.setOnClickListener {
             val lines = LadderApplication.logLines.value ?: emptyList()
-            if (lines.isEmpty()) {
+            val filtered = if (logFilterQuery.isBlank()) {
+                lines
+            } else {
+                lines.filter { it.contains(logFilterQuery, ignoreCase = true) }
+            }
+            if (filtered.isEmpty()) {
                 Toast.makeText(this, "当前无日志", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("LadderAirport Logs", lines.joinToString("\n")))
+            cm.setPrimaryClip(ClipData.newPlainText("LadderAirport Logs", filtered.joinToString("\n")))
             Toast.makeText(this, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateAutoScrollButton() {
+        logsBinding.btnAutoScroll.text = if (autoScrollLogs) "自动滚动" else "回到底部"
+        logsBinding.btnAutoScroll.setTextColor(
+            getColor(if (autoScrollLogs) R.color.terminal_accent else R.color.terminal_muted)
+        )
+    }
+
+    private fun renderLogs(lines: List<String>) {
+        val filtered = if (logFilterQuery.isBlank()) {
+            lines
+        } else {
+            lines.filter { it.contains(logFilterQuery, ignoreCase = true) }
+        }
+        logsBinding.tvTerminalOutput.text = when {
+            lines.isEmpty() -> "等待日志输出..."
+            filtered.isEmpty() -> "没有匹配「$logFilterQuery」的日志"
+            else -> filtered.joinToString("\n")
+        }
+        logsBinding.tvLogCount.text = if (logFilterQuery.isBlank()) {
+            "${lines.size} lines"
+        } else {
+            "${filtered.size}/${lines.size} lines"
+        }
+        if (autoScrollLogs) {
+            logsBinding.scrollLogs.post {
+                logsBinding.scrollLogs.fullScroll(View.FOCUS_DOWN)
+            }
         }
     }
 
@@ -635,7 +795,7 @@ class MainActivity : AppCompatActivity() {
             dashboardBinding.tvHeroPanelUrl.text = panelUrl
         } else {
             dashboardBinding.tvHeroNodeName.text = "未配置节点"
-            dashboardBinding.tvHeroPanelUrl.text = "请切换至「配置」页面填入或扫码导入信息"
+            dashboardBinding.tvHeroPanelUrl.text = "请切换至「节点配置」页面填入或扫码导入信息"
         }
     }
 
@@ -695,6 +855,7 @@ class MainActivity : AppCompatActivity() {
             proxyBinding.switchConnect.isChecked = running == true
             suppressConnectSwitch = false
             proxyBinding.tvClientStatus.text = if (running == true) "已连接" else "已断开"
+            updateDashboardVpnRow(running == true, null)
             refreshStatusChrome()
         }
 
@@ -721,21 +882,14 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         "已连接"
                     }
+                    updateDashboardVpnRow(true, selected)
                 }
             } catch (_: Exception) {
             }
         }
 
         LadderApplication.logLines.observe(this) { lines ->
-            logsBinding.tvTerminalOutput.text = if (lines.isEmpty()) {
-                "等待日志输出..."
-            } else {
-                lines.joinToString("\n")
-            }
-            logsBinding.tvLogCount.text = "${lines.size} lines"
-            logsBinding.scrollLogs.post {
-                logsBinding.scrollLogs.fullScroll(View.FOCUS_DOWN)
-            }
+            renderLogs(lines)
         }
     }
 
@@ -958,6 +1112,63 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun toggleConfigPreview() {
+        isConfigPreviewExpanded = !isConfigPreviewExpanded
+        configBinding.layoutConfigPreviewBody.visibility =
+            if (isConfigPreviewExpanded) View.VISIBLE else View.GONE
+        configBinding.tvToggleConfigPreview.text =
+            if (isConfigPreviewExpanded) "收起" else "展开"
+    }
+
+    private fun updateDashboardVpnRow(running: Boolean, selectedTag: String?) {
+        if (running) {
+            dashboardBinding.tvDashboardVpnStatus.text = if (!selectedTag.isNullOrBlank()) {
+                "已连接 · $selectedTag"
+            } else {
+                "已连接"
+            }
+            dashboardBinding.tvDashboardVpnStatus.setTextColor(
+                themeColor(androidx.appcompat.R.attr.colorPrimary)
+            )
+        } else {
+            dashboardBinding.tvDashboardVpnStatus.text = "未连接"
+            dashboardBinding.tvDashboardVpnStatus.setTextColor(
+                themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+            )
+        }
+    }
+
+    private fun isBatteryOptimizationIgnored(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun updateBatteryOptimizationUi() {
+        val ignored = isBatteryOptimizationIgnored()
+        if (ignored) {
+            dashboardBinding.tvBatteryStatus.text = "已加入白名单"
+            dashboardBinding.tvBatteryStatus.setTextColor(getColor(R.color.status_running))
+            configBinding.tvBatteryOptAction.text = "已开启"
+            configBinding.tvBatteryOptAction.setTextColor(getColor(R.color.status_running))
+        } else {
+            dashboardBinding.tvBatteryStatus.text = "未加白名单 (点击设置)"
+            dashboardBinding.tvBatteryStatus.setTextColor(
+                themeColor(androidx.appcompat.R.attr.colorError)
+            )
+            configBinding.tvBatteryOptAction.text = "去开启"
+            configBinding.tvBatteryOptAction.setTextColor(
+                themeColor(androidx.appcompat.R.attr.colorPrimary)
+            )
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
 
     private fun requestBatteryOptimizationExemption() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
